@@ -17,6 +17,6 @@ If you run the game through Steam as a non-Steam game, you can use steam-launch.
 to update the game before running it:
 
 1. Make the script executable: `chmod +x steam-launch.sh`
-2. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%`
+2. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%` (replacing the path with the actual path to the script)
 
 Note that you still need epoch-update.sh in the WoW installation directory for steam-launch.sh to work.
