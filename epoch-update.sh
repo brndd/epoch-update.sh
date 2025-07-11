@@ -182,6 +182,5 @@ else
         notify_success "$UPDATED files updated successfully."
     fi
 fi
-fi
 
 exit $E_SUCCESS
