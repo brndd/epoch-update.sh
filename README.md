@@ -18,3 +18,5 @@ to update the game before running it:
 
 1. Make the script executable: `chmod +x steam-launch.sh`
 2. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%`
+
+Note that you still need epoch-update.sh in the WoW installation directory for steam-launch.sh to work.
