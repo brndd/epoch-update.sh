@@ -155,9 +155,7 @@ done
 
 NUM_TO_UPDATE="${#TO_UPDATE[@]}"
 
-if [[ "$TOTAL_DOWNLOAD_SIZE" -gt 0 ]]; then
-    SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $TOTAL_DOWNLOAD_SIZE / 1024 / 1024 }")
-fi
+SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $TOTAL_DOWNLOAD_SIZE / 1024 / 1024 }")
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
     echo ""
