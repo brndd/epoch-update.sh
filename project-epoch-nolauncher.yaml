@@ -4,7 +4,7 @@ gogslug: ''
 humblestoreid: ''
 installer_slug: project-epoch-nolauncher
 name: Project Epoch
-notes: 'Requires manually downloading the game client via torrent. Includes an automatic updater script.'
+notes: 'Requires manually downloading the game client from the website. Includes an automatic updater script.'
 runner: wine
 require-binaries: jq, curl, notify-send
 script:
