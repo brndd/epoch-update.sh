@@ -78,16 +78,15 @@ function notify_failure() {
     fi
 }
 
-function notify_success() {
+function notify_status() {
     local msg="$1"
     if [[ "$HEADLESS" -eq 0 && -n "$NOTIFY_SEND" && ! -t 1 ]]; then
-        "$NOTIFY_SEND" -u normal -t 5000 "Epoch Update Complete" "$msg"
+        "$NOTIFY_SEND" -u normal -t 5000 "Epoch Update" "$msg"
     fi
 }
 
 trap 'msg="Script failed at line $LINENO"; echo "$msg"; notify_failure "$msg"; exit 1' ERR
 
-# Use current directory if WOW_DIR is unset or empty
 if [[ -z "$WOW_DIR" ]]; then
     WOW_DIR="$(pwd)"
 fi
@@ -110,23 +109,27 @@ function hash_file() {
     fi
 }
 
-# Fetch the manifest
 echo "Downloading manifest..."
 if ! curl -sSfL "$MANIFEST_URL" -o "$TMP_MANIFEST"; then
     echo "Failed to fetch manifest"
     notify_failure "Failed to fetch manifest"
     exit $E_MANIFEST_FAILED
 fi
+# Normalize manifest paths to use forward slashes
+jq '.Files |= map(.Path |= gsub("\\\\"; "/"))' "$TMP_MANIFEST" > "${TMP_MANIFEST}.tmp" && mv "${TMP_MANIFEST}.tmp" "$TMP_MANIFEST"
 
-# Read file count
 FILE_COUNT=$(jq '.Files | length' "$TMP_MANIFEST")
 echo "Found $FILE_COUNT files in manifest."
 
 UPDATED=0
 CURRENT=0
+TOTAL_DOWNLOAD_SIZE=0
+declare -a TO_UPDATE=()
+declare -A FILE_URLS
 
+# First pass: Determine which files need to be updated
 for i in $(seq 0 $((FILE_COUNT - 1))); do
-    FILE_PATH=$(jq -r ".Files[$i].Path" "$TMP_MANIFEST" | sed 's|\\|/|g')
+    FILE_PATH=$(jq -r ".Files[$i].Path" "$TMP_MANIFEST")
     EXPECTED_HASH=$(jq -r ".Files[$i].Hash" "$TMP_MANIFEST")
     URLS=($(jq -r ".Files[$i].Urls | .cloudflare, .digitalocean, .none" "$TMP_MANIFEST"))
 
@@ -144,14 +147,42 @@ for i in $(seq 0 $((FILE_COUNT - 1))); do
     fi
 
     echo "[UPDATE NEEDED] $FILE_PATH"
+    TO_UPDATE+=("$FILE_PATH")
+    FILE_URLS["$FILE_PATH"]="${URLS[*]}"
+    FILE_SIZE=$(jq -r ".Files[$i].Size" "$TMP_MANIFEST")
+    TOTAL_DOWNLOAD_SIZE=$((TOTAL_DOWNLOAD_SIZE + FILE_SIZE))
+done
 
-    if [[ "$DRY_RUN" -eq 1 ]]; then
-        continue
-    fi
+NUM_TO_UPDATE="${#TO_UPDATE[@]}"
+
+if [[ "$TOTAL_DOWNLOAD_SIZE" -gt 0 ]]; then
+    SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $TOTAL_DOWNLOAD_SIZE / 1024 / 1024 }")
+fi
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo ""
+    echo "Dry run complete. $NUM_TO_UPDATE files would be updated. Download size: $SIZE_MB MiB."
+    exit $E_SUCCESS
+fi
+
+if [[ "$NUM_TO_UPDATE" -gt 0 ]]; then
+    echo ""
+    echo "$NUM_TO_UPDATE files need to be updated. Total download size: ${SIZE_MB} MiB."
+    
+    notify_status "$NUM_TO_UPDATE file updates (size: $SIZE_MB MiB) are being downloaded."
+fi
+
+# Second pass: Download updated files
+for FILE_PATH in "${TO_UPDATE[@]}"; do
+    LOCAL_PATH="$WOW_DIR/$FILE_PATH"
+    URLS=(${FILE_URLS["$FILE_PATH"]})
+    EXPECTED_HASH=$(jq -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Hash" "$TMP_MANIFEST")
+
+    echo "Downloading $FILE_PATH..."
 
     SUCCESS=0
     for URL in "${URLS[@]}"; do
-        echo "Downloading $FILE_PATH from $URL ..."
+        echo "Attempting $URL..."
         if [[ "$HEADLESS" -eq 1 ]]; then
             CURL_FLAGS=(--silent --show-error --fail --location)
         else
@@ -161,18 +192,18 @@ for i in $(seq 0 $((FILE_COUNT - 1))); do
         if curl "${CURL_FLAGS[@]}" "$URL" -o "$LOCAL_PATH"; then
             NEW_HASH=$(hash_file "$LOCAL_PATH")
             if [[ "$NEW_HASH" == "$EXPECTED_HASH" ]]; then
-                SUCCESS=1
                 ((UPDATED+=1))
+                SUCCESS=1
                 break
             else
-                echo "Hash mismatch for $FILE_PATH from $URL"
+                echo "Hash mismatch for $FILE_PATH from $URL. Expected $EXPECTED_HASH, was $NEW_HASH."
             fi
         else
             echo "Download failed from $URL"
         fi
     done
 
-    if [[ $SUCCESS -ne 1 ]]; then
+    if [[ "$SUCCESS" -ne 1 ]]; then
         echo "Failed to update $FILE_PATH"
         notify_failure "Failed to update $FILE_PATH"
         exit $E_DOWNLOAD_FAILED
@@ -182,13 +213,5 @@ done
 echo ""
 echo "$UPDATED files updated."
 echo "$CURRENT files already up to date."
-
-if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo "Dry run completed. No files were modified."
-else
-    if [[ "$UPDATED" -gt 0 && "$HEADLESS" -eq 0 && ! -t 1 ]]; then
-        notify_success "$UPDATED files updated successfully."
-    fi
-fi
 
 exit $E_SUCCESS
