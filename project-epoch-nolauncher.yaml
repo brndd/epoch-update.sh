@@ -17,10 +17,10 @@ script:
     exe: $GAMEDIR/drive_c/project_epoch/Project-Epoch.exe
     prefix: $GAMEDIR
   install_complete_text: "Installation Complete!\r\n\r\n\
-    Please note: the game has been set up with a pre-launch script to\
-    automatically download updates from Project Epoch upon launch.\
-    You should get a desktop notification if updates are being downloaded.\
-    Please wait for the download to complete when this happens; the game will\
+    Please note: the game has been set up with a pre-launch script to \
+    automatically download updates from Project Epoch upon launch. \
+    You should get a desktop notification if updates are being downloaded. \
+    Please wait for the download to complete when this happens; the game will \
     launch automatically once it's done."
   installer:
   - execute:
