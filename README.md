@@ -20,3 +20,7 @@ to update the game before running it:
 2. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%` (replacing the path with the actual path to the script)
 
 Note that you still need epoch-update.sh in the WoW installation directory for steam-launch.sh to work.
+
+## Lutris install script
+
+`project-epoch-nolauncher.yaml` is a Lutris install script that sets the game up with the updater script.
