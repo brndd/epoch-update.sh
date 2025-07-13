@@ -23,4 +23,4 @@ Note that you still need epoch-update.sh in the WoW installation directory for s
 
 ## Lutris install script
 
-`project-epoch-nolauncher.yaml` is a Lutris install script that sets the game up with the updater script.
+`epoch-lutris-installer-direct.yaml` and `epoch-lutris-installer-torrent.yaml` are Lutris install scripts that set the game up with the updater script for you. The -direct one automatically downloades the game from Epoch's website, while the -torrent one asks to be pointed to the loose files downloaded from the torrent (or any other version 3.3.5 WoW client).
