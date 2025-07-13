@@ -1,0 +1,51 @@
+description: ''
+game_slug: project-epoch
+gogslug: ''
+humblestoreid: ''
+installer_slug: project-epoch-nolauncher
+name: Project Epoch
+notes: 'Includes an automatic updater script.'
+runner: wine
+require-binaries: jq, curl, notify-send
+script:
+  files:
+  - file1: https://epoch-cdn.com/client/3.3.5-enUS-minified.zip
+  - file2: https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/epoch-update.sh
+  game:
+    arch: win64
+    exe: $GAMEDIR/drive_c/project_epoch/Project-Epoch.exe
+    prefix: $GAMEDIR
+  install_complete_text: "Installation Complete!\r\n\r\n\
+    Please note: the game has been set up with a pre-launch script to \
+    automatically download updates from Project Epoch upon launch. \
+    You should get a desktop notification if updates are being downloaded. \
+    Please wait for the download to complete when this happens; the game will \
+    launch automatically once it's done."
+  installer:
+  - extract:
+      file: $file1
+      dst: $GAMEDIR/drive_c/project_epoch/
+  - move:
+      src: $file2
+      dst: $GAMEDIR/drive_c/project_epoch/epoch-update.sh
+  - chmodx: $GAMEDIR/drive_c/project_epoch/epoch-update.sh
+  - execute:
+      env:
+        WOW_DIR: $GAMEDIR/drive_c/project_epoch/
+      command: bash "$GAMEDIR/drive_c/project_epoch/epoch-update.sh" --headless
+      description: Updating game files...
+      disable_runtime: true
+  - task:
+      arch: win64
+      description: Creating 64bit Wine prefix...
+      name: create_prefix
+      prefix: $GAMEDIR
+  system:
+    env:
+      WOW_DIR: $GAMEDIR/drive_c/project_epoch/
+    prelaunch_command: $GAMEDIR/drive_c/project_epoch/epoch-update.sh
+    prelaunch_wait: true
+slug: project-epoch-nolauncher
+steamid: null
+version: "launcherless"
+year: 2025
