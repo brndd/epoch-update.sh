@@ -175,8 +175,10 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
     LOCAL_PATH="$WOW_DIR/$FILE_PATH"
     URLS=(${FILE_URLS["$FILE_PATH"]})
     EXPECTED_HASH=$(jq -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Hash" "$TMP_MANIFEST")
+    FILE_SIZE=$(jq -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Size" "$TMP_MANIFEST")
+    FILE_SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $FILE_SIZE / 1024 / 1024 }")
 
-    echo "Downloading $FILE_PATH..."
+    echo "Downloading $FILE_PATH ($FILE_SIZE_MB MiB)..."
 
     SUCCESS=0
     for URL in "${URLS[@]}"; do
