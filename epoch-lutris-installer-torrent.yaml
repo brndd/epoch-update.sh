@@ -2,7 +2,7 @@ description: ''
 game_slug: project-epoch
 gogslug: ''
 humblestoreid: ''
-installer_slug: project-epoch-nolauncher
+installer_slug: project-epoch-nolauncher-torrent
 name: Project Epoch
 notes: 'Requires manually downloading the game client from the website. Includes an automatic updater script.'
 runner: wine
@@ -47,7 +47,7 @@ script:
       WOW_DIR: $GAMEDIR/drive_c/project_epoch/
     prelaunch_command: $GAMEDIR/drive_c/project_epoch/epoch-update.sh
     prelaunch_wait: true
-slug: project-epoch-nolauncher
+slug: project-epoch-nolauncher-torrent
 steamid: null
-version: "June 2025"
+version: "launcherless"
 year: 2025
