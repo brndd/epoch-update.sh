@@ -130,9 +130,9 @@ if ! curl -sSfL "$MANIFEST_URL" -o "$TMP_MANIFEST"; then
     exit $E_MANIFEST_FAILED
 fi
 # Normalize manifest paths to use forward slashes
-$JQ '.Files |= map(.Path |= gsub("\\\\"; "/"))' "$TMP_MANIFEST" > "${TMP_MANIFEST}.tmp" && mv "${TMP_MANIFEST}.tmp" "$TMP_MANIFEST"
+"$JQ" '.Files |= map(.Path |= gsub("\\\\"; "/"))' "$TMP_MANIFEST" > "${TMP_MANIFEST}.tmp" && mv "${TMP_MANIFEST}.tmp" "$TMP_MANIFEST"
 
-FILE_COUNT=$($JQ '.Files | length' "$TMP_MANIFEST")
+FILE_COUNT=$("$JQ" '.Files | length' "$TMP_MANIFEST")
 echo "Found $FILE_COUNT files in manifest."
 
 UPDATED=0
@@ -143,9 +143,9 @@ declare -A FILE_URLS
 
 # First pass: Determine which files need to be updated
 for i in $(seq 0 $((FILE_COUNT - 1))); do
-    FILE_PATH=$($JQ -r ".Files[$i].Path" "$TMP_MANIFEST")
-    EXPECTED_HASH=$($JQ -r ".Files[$i].Hash" "$TMP_MANIFEST")
-    URLS=($($JQ -r ".Files[$i].Urls | .cloudflare, .digitalocean, .none" "$TMP_MANIFEST"))
+    FILE_PATH=$("$JQ" -r ".Files[$i].Path" "$TMP_MANIFEST")
+    EXPECTED_HASH=$("$JQ" -r ".Files[$i].Hash" "$TMP_MANIFEST")
+    URLS=($("$JQ" -r ".Files[$i].Urls | .cloudflare, .digitalocean, .none" "$TMP_MANIFEST"))
 
     LOCAL_PATH="$WOW_DIR/$FILE_PATH"
     LOCAL_DIR=$(dirname "$LOCAL_PATH")
@@ -163,7 +163,7 @@ for i in $(seq 0 $((FILE_COUNT - 1))); do
     echo "[UPDATE NEEDED] $FILE_PATH"
     TO_UPDATE+=("$FILE_PATH")
     FILE_URLS["$FILE_PATH"]="${URLS[*]}"
-    FILE_SIZE=$($JQ -r ".Files[$i].Size" "$TMP_MANIFEST")
+    FILE_SIZE=$("$JQ" -r ".Files[$i].Size" "$TMP_MANIFEST")
     TOTAL_DOWNLOAD_SIZE=$((TOTAL_DOWNLOAD_SIZE + FILE_SIZE))
 done
 
@@ -188,8 +188,8 @@ fi
 for FILE_PATH in "${TO_UPDATE[@]}"; do
     LOCAL_PATH="$WOW_DIR/$FILE_PATH"
     URLS=(${FILE_URLS["$FILE_PATH"]})
-    EXPECTED_HASH=$($JQ -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Hash" "$TMP_MANIFEST")
-    FILE_SIZE=$($JQ -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Size" "$TMP_MANIFEST")
+    EXPECTED_HASH=$("$JQ" -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Hash" "$TMP_MANIFEST")
+    FILE_SIZE=$("$JQ" -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Size" "$TMP_MANIFEST")
     FILE_SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $FILE_SIZE / 1024 / 1024 }")
 
     echo "Downloading $FILE_PATH ($FILE_SIZE_MB MiB)..."
