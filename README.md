@@ -26,3 +26,5 @@ This is a launch shim that lets you update the game when launching it from Steam
 # Lutris install scripts
 
 `epoch-lutris-installer-direct.yaml` and `epoch-lutris-installer-torrent.yaml` are Lutris install scripts that set the game up with the updater script for you. The -direct one automatically downloads the game from Epoch's website, while the -torrent one asks to be pointed to the loose files downloaded from the torrent (or any other version 3.3.5 WoW client).
+
+A slightly modified version of the direct installer is also available on [the Lutris website](https://lutris.net/games/project-epoch/). This version downloads a prebuilt jq binary to make it more portable across distributions, as not all distros ship jq.
