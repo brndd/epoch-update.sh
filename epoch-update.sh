@@ -25,18 +25,32 @@ Options:
 
 Environment Variables:
   WOW_DIR           Path to the World of Warcraft directory (default: current directory).
+  JQ                Path to the jq binary to be used over system jq.
 EOF
 }
+
+# Ensure jq exists, either as defined by the env var or in $PATH.
+if [[ -n "${JQ:-}" ]]; then
+    if [[ ! -x "$JQ" ]]; then
+        echo "Error: JQ is set to '$JQ' but it is not executable."
+        exit 1
+    fi
+elif command -v jq &>/dev/null; then
+    JQ=$(command -v jq)
+else
+    echo "Error: jq not found. Please install jq or set the JQ environment variable to point to it."
+    exit 1
+fi
+
 
 function check_command() {
     local cmd="$1"
     if ! command -v "$cmd" &>/dev/null; then
-        echo "Required command '$cmd' not found. Please install it."
+        echo "Error: Required command '$cmd' not found. Please install it."
         exit 1
     fi
 }
 
-check_command jq
 check_command curl
 
 # Check for either md5sum or md5 (macOS)
@@ -46,7 +60,7 @@ if command -v md5sum &>/dev/null; then
 elif command -v md5 &>/dev/null; then
     MD5_CMD="md5"
 else
-    echo "Neither 'md5sum' nor 'md5' command found. Please install one of them."
+    echo "Error: Neither 'md5sum' nor 'md5' command found. Please install one of them."
     exit 1
 fi
 
@@ -116,9 +130,9 @@ if ! curl -sSfL "$MANIFEST_URL" -o "$TMP_MANIFEST"; then
     exit $E_MANIFEST_FAILED
 fi
 # Normalize manifest paths to use forward slashes
-jq '.Files |= map(.Path |= gsub("\\\\"; "/"))' "$TMP_MANIFEST" > "${TMP_MANIFEST}.tmp" && mv "${TMP_MANIFEST}.tmp" "$TMP_MANIFEST"
+$JQ '.Files |= map(.Path |= gsub("\\\\"; "/"))' "$TMP_MANIFEST" > "${TMP_MANIFEST}.tmp" && mv "${TMP_MANIFEST}.tmp" "$TMP_MANIFEST"
 
-FILE_COUNT=$(jq '.Files | length' "$TMP_MANIFEST")
+FILE_COUNT=$($JQ '.Files | length' "$TMP_MANIFEST")
 echo "Found $FILE_COUNT files in manifest."
 
 UPDATED=0
@@ -129,9 +143,9 @@ declare -A FILE_URLS
 
 # First pass: Determine which files need to be updated
 for i in $(seq 0 $((FILE_COUNT - 1))); do
-    FILE_PATH=$(jq -r ".Files[$i].Path" "$TMP_MANIFEST")
-    EXPECTED_HASH=$(jq -r ".Files[$i].Hash" "$TMP_MANIFEST")
-    URLS=($(jq -r ".Files[$i].Urls | .cloudflare, .digitalocean, .none" "$TMP_MANIFEST"))
+    FILE_PATH=$($JQ -r ".Files[$i].Path" "$TMP_MANIFEST")
+    EXPECTED_HASH=$($JQ -r ".Files[$i].Hash" "$TMP_MANIFEST")
+    URLS=($($JQ -r ".Files[$i].Urls | .cloudflare, .digitalocean, .none" "$TMP_MANIFEST"))
 
     LOCAL_PATH="$WOW_DIR/$FILE_PATH"
     LOCAL_DIR=$(dirname "$LOCAL_PATH")
@@ -149,7 +163,7 @@ for i in $(seq 0 $((FILE_COUNT - 1))); do
     echo "[UPDATE NEEDED] $FILE_PATH"
     TO_UPDATE+=("$FILE_PATH")
     FILE_URLS["$FILE_PATH"]="${URLS[*]}"
-    FILE_SIZE=$(jq -r ".Files[$i].Size" "$TMP_MANIFEST")
+    FILE_SIZE=$($JQ -r ".Files[$i].Size" "$TMP_MANIFEST")
     TOTAL_DOWNLOAD_SIZE=$((TOTAL_DOWNLOAD_SIZE + FILE_SIZE))
 done
 
@@ -174,8 +188,8 @@ fi
 for FILE_PATH in "${TO_UPDATE[@]}"; do
     LOCAL_PATH="$WOW_DIR/$FILE_PATH"
     URLS=(${FILE_URLS["$FILE_PATH"]})
-    EXPECTED_HASH=$(jq -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Hash" "$TMP_MANIFEST")
-    FILE_SIZE=$(jq -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Size" "$TMP_MANIFEST")
+    EXPECTED_HASH=$($JQ -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Hash" "$TMP_MANIFEST")
+    FILE_SIZE=$($JQ -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Size" "$TMP_MANIFEST")
     FILE_SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $FILE_SIZE / 1024 / 1024 }")
 
     echo "Downloading $FILE_PATH ($FILE_SIZE_MB MiB)..."
