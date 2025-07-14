@@ -1,6 +1,8 @@
 # epoch-update.sh
 
-Vibecoded updater bash script for Project Epoch to replace the stinky Electron launcher.
+A simple updater bash script for Project Epoch to replace the official Electron-based updater, which can work poorly under Wine.
+
+The script does basically the exact same thing the official launcher does, but without a GUI. It fetches the same manifest.json the official updater does, compares local file hashes to the hashes in the manifest, and downloads any files that do not match from the Project Epoch CDN URLs specified in the manifest.
 
 ## Usage
 
@@ -11,16 +13,15 @@ Vibecoded updater bash script for Project Epoch to replace the stinky Electron l
 
 The intended usage is to run this as a Lutris pre-launch script. When ran non-interactively, the script will try to use notify-send to pop up a desktop notification when files are updated and if updates fail. This is because Lutris doesn't support aborting launching the game if the pre-launch script fails.
 
-## Steam shim
+# steam-launch.sh
 
-If you run the game through Steam as a non-Steam game, you can use steam-launch.sh
-to update the game before running it:
+This is a launch shim that lets you update the game when launching it from Steam, if you have added the game to your library as a non-Steam game.
 
-1. Make the script executable: `chmod +x steam-launch.sh`
-2. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%` (replacing the path with the actual path to the script)
+1. Download `epoch-update.sh` and place into the game directory (next to WoW.exe).
+2. Make the script executable: `chmod +x steam-launch.sh`
+3. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%` (replacing the path with the actual path to the script)
 
-Note that you still need epoch-update.sh in the WoW installation directory for steam-launch.sh to work.
 
-## Lutris install script
+# Lutris install scripts
 
 `epoch-lutris-installer-direct.yaml` and `epoch-lutris-installer-torrent.yaml` are Lutris install scripts that set the game up with the updater script for you. The -direct one automatically downloads the game from Epoch's website, while the -torrent one asks to be pointed to the loose files downloaded from the torrent (or any other version 3.3.5 WoW client).
