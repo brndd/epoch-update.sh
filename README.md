@@ -18,8 +18,8 @@ The intended usage is to run this as a Lutris pre-launch script. When ran non-in
 
 This is a launch shim that lets you update the game when launching it from Steam, if you have added the game to your library as a non-Steam game.
 
-1. Download `epoch-update.sh`, place into the game directory (next to WoW.exe) and `chmod +x epoch-update.sh` to make it executable.
-2. Make the script executable: `chmod +x steam-launch.sh`
+1. Download `epoch-update.sh` and `steam-launch.sh` and place them into the game directory (next to WoW.exe)
+2. Make the scripts executable: `chmod +x epoch-update.sh steam-launch.sh`
 3. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%` (replacing the path with the actual path to the script)
 
 
