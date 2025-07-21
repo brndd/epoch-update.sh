@@ -51,20 +51,6 @@ for arg in "$@"; do
     esac
 done
 
-# Ensure jq exists, either as defined by the env var or in $PATH.
-if [[ -n "${JQ:-}" ]]; then
-    if [[ ! -x "$JQ" ]]; then
-        echo "Error: JQ is set to '$JQ' but it is not executable."
-        exit 1
-    fi
-elif command -v jq &>/dev/null; then
-    JQ=$(command -v jq)
-else
-    echo "Error: jq not found. Please install jq or set the JQ environment variable to point to it."
-    exit 1
-fi
-
-
 function check_command() {
     local cmd="$1"
     if ! command -v "$cmd" &>/dev/null; then
@@ -72,19 +58,6 @@ function check_command() {
         exit 1
     fi
 }
-
-check_command curl
-
-# Check for either md5sum or md5 (macOS)
-MD5_CMD=""
-if command -v md5sum &>/dev/null; then
-    MD5_CMD="md5sum"
-elif command -v md5 &>/dev/null; then
-    MD5_CMD="md5"
-else
-    echo "Error: Neither 'md5sum' nor 'md5' command found. Please install one of them."
-    exit 1
-fi
 
 function notify_failure() {
     local msg="$1"
@@ -100,6 +73,41 @@ function notify_status() {
     fi
 }
 
+function hash_file() {
+    local file="$1"
+    if [[ "$MD5_CMD" == "md5sum" ]]; then
+        md5sum "$file" | awk '{ print $1 }'
+    else
+        md5 -q "$file"
+    fi
+}
+
+check_command curl
+
+# Ensure jq exists, either as defined by the env var or in $PATH.
+if [[ -n "${JQ:-}" ]]; then
+    if [[ ! -x "$JQ" ]]; then
+        echo "Error: JQ is set to '$JQ' but it is not executable."
+        exit 1
+    fi
+elif command -v jq &>/dev/null; then
+    JQ=$(command -v jq)
+else
+    echo "Error: jq not found. Please install jq or set the JQ environment variable to point to it."
+    exit 1
+fi
+
+
+# Check for either md5sum or md5 (macOS)
+MD5_CMD=""
+if command -v md5sum &>/dev/null; then
+    MD5_CMD="md5sum"
+elif command -v md5 &>/dev/null; then
+    MD5_CMD="md5"
+else
+    echo "Error: Neither 'md5sum' nor 'md5' command found. Please install one of them."
+    exit 1
+fi
 
 # Verify Wow.exe exists in WOW_DIR (case-insensitive)
 if ! find "$WOW_DIR" -maxdepth 1 -type f -iname 'Wow.exe' | grep -q .; then
@@ -109,15 +117,6 @@ if ! find "$WOW_DIR" -maxdepth 1 -type f -iname 'Wow.exe' | grep -q .; then
 fi
 
 TMP_MANIFEST="/tmp/epoch_manifest.json"
-
-function hash_file() {
-    local file="$1"
-    if [[ "$MD5_CMD" == "md5sum" ]]; then
-        md5sum "$file" | awk '{ print $1 }'
-    else
-        md5 -q "$file"
-    fi
-}
 
 echo "Downloading manifest..."
 if ! curl -sSfL "$MANIFEST_URL" -o "$TMP_MANIFEST"; then
