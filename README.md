@@ -7,8 +7,8 @@ The script does basically the exact same thing the official launcher does, but w
 ## Usage
 
 
-1. Make sure `jq` and `curl` are available (install them from your package manager if they aren't). If you want the script to send desktop notifications when files are updated or if updates fail, install `notify-send` too.
-2. Place in your Project Epoch installation directory (next to WoW.exe). Alternatively place anywhere and specify the WOW_DIR environment variable before running.
+1. Make sure `jq` and `curl` are available (install them from your package manager if they aren't). If you want the script to send desktop notifications when files are updated or if updates fail, install `notify-send` too. Alternatively you can download a static jq binary from https://github.com/jqlang/jq/releases and specify its path using the `JQ=/path/to/jq` before running the script.
+2. Download [epoch-update.sh](https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/epoch-update.sh) and place it in your Project Epoch installation directory (next to WoW.exe). Alternatively place anywhere and specify the WOW_DIR environment variable before running.
 3. `chmod +x epoch-update.sh` to make the script executable.
 4. Run the script. If you're unsure about it working, you can pass `--dry-run` to just check if files need updating but not download anything. You can also pass `--help` to see the (limited) options.
 
@@ -18,7 +18,7 @@ The intended usage is to run this as a Lutris pre-launch script. When ran non-in
 
 This is a launch shim that lets you update the game when launching it from Steam, if you have added the game to your library as a non-Steam game.
 
-1. Download `epoch-update.sh` and `steam-launch.sh` and place them into the game directory (next to WoW.exe)
+1. Download [epoch-update.sh](https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/epoch-update.sh) and [steam-launch.sh](https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/steam-launch.sh) and place them into the game directory (next to WoW.exe)
 2. Make the scripts executable: `chmod +x epoch-update.sh steam-launch.sh`
 3. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%` (replacing the path with the actual path to the script)
 
