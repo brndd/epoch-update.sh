@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # epoch-update.sh Steam launch shim adapted from BepInEx's launch shim
 #
 # HOW TO USE:
@@ -7,16 +7,6 @@
 
 SCRIPT_PATH="$(readlink -f "$0")"
 BASEDIR="$(dirname "$SCRIPT_PATH")"
-
-# Special case: launched via Steam
-if [ "$2" = "SteamLaunch" ]; then
-    cmd="$1 $2 $3 $4 $0"
-    shift 4
-    exec $cmd "$@"
-    exit
-fi
-
-# Path to updater script (assumed in same dir as this shim)
 UPDATER="$BASEDIR/epoch-update.sh"
 
 # Ensure the updater is executable
@@ -24,6 +14,17 @@ if [ ! -x "$UPDATER" ]; then
     echo "Error: epoch-update.sh not found or not executable in $BASEDIR"
     exit 1
 fi
+
+args=("$@")
+for i in "${!args[@]}"; do
+    if [ "${args[$i]}" = "SteamLaunch" ]; then
+        # Insert $0 at position i+3 (two after SteamLaunch)
+        insert_pos=$((i + 3))
+        new_args=("${args[@]:0:$insert_pos}" "$0" "${args[@]:$insert_pos}")
+        exec "${new_args[@]}"
+        exit
+    fi
+done
 
 # Run the updater
 "$UPDATER"
