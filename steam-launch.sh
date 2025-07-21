@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 # epoch-update.sh Steam launch shim adapted from BepInEx's launch shim
 #
 # HOW TO USE:
