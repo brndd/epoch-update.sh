@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+trap 'msg="Script failed at line $LINENO"; echo "$msg"; notify_failure "$msg"; exit 1' ERR
 
 NOTIFY_SEND=$(command -v notify-send || true)
 
 HEADLESS=0
 DRY_RUN=0
-WOW_DIR="${WOW_DIR:-}"
+WOW_DIR="${WOW_DIR:-$(pwd)}"
 MANIFEST_URL="https://updater.project-epoch.net/api/v2/manifest"
 
 E_SUCCESS=0
@@ -28,6 +29,27 @@ Environment Variables:
   JQ                Path to the jq binary to be used over system jq.
 EOF
 }
+
+# Parse arguments
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run)
+            DRY_RUN=1
+            ;;
+        --headless)
+            HEADLESS=1
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $arg"
+            usage
+            exit 1
+            ;;
+    esac
+done
 
 # Ensure jq exists, either as defined by the env var or in $PATH.
 if [[ -n "${JQ:-}" ]]; then
@@ -64,27 +86,6 @@ else
     exit 1
 fi
 
-# Parse arguments
-for arg in "$@"; do
-    case "$arg" in
-        --dry-run)
-            DRY_RUN=1
-            ;;
-        --headless)
-            HEADLESS=1
-            ;;
-        -h|--help)
-            usage
-            exit 0
-            ;;
-        *)
-            echo "Unknown argument: $arg"
-            usage
-            exit 1
-            ;;
-    esac
-done
-
 function notify_failure() {
     local msg="$1"
     if [[ "$HEADLESS" -eq 0 && -n "$NOTIFY_SEND" && ! -t 0 ]]; then
@@ -99,11 +100,6 @@ function notify_status() {
     fi
 }
 
-trap 'msg="Script failed at line $LINENO"; echo "$msg"; notify_failure "$msg"; exit 1' ERR
-
-if [[ -z "$WOW_DIR" ]]; then
-    WOW_DIR="$(pwd)"
-fi
 
 # Verify Wow.exe exists in WOW_DIR (case-insensitive)
 if ! find "$WOW_DIR" -maxdepth 1 -type f -iname 'Wow.exe' | grep -q .; then
