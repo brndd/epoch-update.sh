@@ -22,7 +22,7 @@ This is a launch shim that lets you update the game when launching it from Steam
 2. Make the scripts executable: `chmod +x epoch-update.sh steam-launch.sh`
 3. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%` (replacing the path with the actual path to the script)
 
-If your system doesn't have jq available in the repository or if installing it is difficult, download the latest jq binary [from here](https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64), place it anywhere, make it executable (`chmod +x jq-linux-amd64`), and then set the Steam launch options to: `"JQ=/path/to/jq-linux-amd64" /path/to/steam-launch.sh %command%` (replacing the paths with the actual paths).
+If your system doesn't have jq available in the repository or if installing it is difficult, download the latest jq binary [from here](https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64), place it anywhere, make it executable (`chmod +x jq-linux-amd64`), and then set the Steam launch options to: `JQ="/path/to/jq-linux-amd64" /path/to/steam-launch.sh %command%` (replacing the paths with the actual paths).
 
 
 # Lutris install scripts
