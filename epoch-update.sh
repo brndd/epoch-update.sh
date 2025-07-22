@@ -28,8 +28,7 @@ Usage: $0 [options]
 Options:
   --dry-run         Check files but do not download or modify anything.
   --headless        Suppress progress bars from curl.
-  --gui[=MODE]      Enable GUI progress bar and errors. Supported modes:
-                        - zenity (default)
+  --gui             Enable GUI progress bar and errors using Zenity.
   --notifications   Enable desktop notifications via notify-send for errors
                     and available updates.
   -h, --help        Show this help message and exit.
@@ -53,17 +52,17 @@ for arg in "$@"; do
             fi
             GUI_MODE="zenity"
             ;;
-        --gui=*)
-            MODE="${arg#--gui=}"
-            if [[ "$MODE" == "zenity" ]] && ! command -v zenity &>/dev/null; then
-                error "--gui=zenity was specified but Zenity is not installed."
-                exit 1
-            else
-                error "Unknown --gui mode: $MODE"
-                exit 1
-            fi
-            GUI_MODE="$MODE"
-            ;;
+#         --gui=*)
+#             MODE="${arg#--gui=}"
+#             if [[ "$MODE" == "zenity" ]] && ! command -v zenity &>/dev/null; then
+#                 error "--gui=zenity was specified but Zenity is not installed."
+#                 exit 1
+#             else
+#                 error "Unknown --gui mode: $MODE"
+#                 exit 1
+#             fi
+#             GUI_MODE="$MODE"
+#             ;;
         --notifications)
             if ! command -v notify-send &>/dev/null; then
                 error "--notifications specified but notify-send is not installed."
@@ -179,8 +178,10 @@ function cleanup() {
     [[ -f "$TMP_PATH" ]] && rm -f "$TMP_PATH" || true
     [[ -f "$TMP_MANIFEST" ]] && rm -f "$TMP_MANIFEST" || true
     
-    #close fifo
-    exec 3>&-
+    if [[ "$GUI_MODE" == "zenity" ]]; then
+        #close fifo
+        exec 3>&-
+    fi
 }
 function on_sigint() {
     echo "Terminated by SIGINT." >&2
