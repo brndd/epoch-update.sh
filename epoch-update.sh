@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with status $?"; echo "$msg"; notify_failure "$msg"; exit 1' ERR
-
-NOTIFY_SEND=$(command -v notify-send || true)
+trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with status $?"; echo "$msg"; gui_error "$msg"; exit 1' ERR
 
 HEADLESS=0
 DRY_RUN=0
-GUI=0
+GUI_MODE=""
+NOTIFICATIONS=0
 WOW_DIR="${WOW_DIR:-$(pwd)}"
 MANIFEST_URL="https://updater.project-epoch.net/api/v2/manifest"
 TMP_PATH="" #global so we can delete it in cleanup if needed
@@ -28,8 +27,11 @@ Usage: $0 [options]
 
 Options:
   --dry-run         Check files but do not download or modify anything.
-  --headless        Suppress desktop notifications and progress bars.
-  --gui             Use Zenity to display a graphical progress bar.
+  --headless        Suppress progress bars from curl.
+  --gui[=MODE]      Enable GUI progress bar. Supported modes:
+                        - zenity (default)
+  --notifications   Enable desktop notifications via notify-send for errors
+                    and available updates.
   -h, --help        Show this help message and exit.
 
 Environment Variables:
@@ -45,11 +47,32 @@ for arg in "$@"; do
             DRY_RUN=1
             ;;
         --gui)
-            GUI=1
+            if ! command -v zenity &>/dev/null; then
+                error "--gui was specified but Zenity is not installed."
+                exit 1
+            fi
+            GUI_MODE="zenity"
+            ;;
+        --gui=*)
+            MODE="${arg#--gui=}"
+            if [[ "$MODE" == "zenity" ]] && ! command -v zenity &>/dev/null; then
+                error "--gui=zenity was specified but Zenity is not installed."
+                exit 1
+            else
+                error "Unknown --gui mode: $MODE"
+                exit 1
+            fi
+            GUI_MODE="$MODE"
+            ;;
+        --notifications)
+            if ! command -v notify-send &>/dev/null; then
+                error "--notifications specified but notify-send is not installed."
+                exit 1
+            fi
+            NOTIFICATIONS=1
             ;;
         --headless)
             HEADLESS=1
-            GUI=0
             ;;
         -h|--help)
             usage
@@ -65,28 +88,45 @@ done
 
 function gui_error() {
     local msg="$1"
-    if [[ "$GUI" -eq 1 ]]; then
-        zenity --error --title="Epoch Update error" --text="$msg"
+    if [[ -n "$GUI_MODE" ]]; then
+        if [[ "$GUI_MODE" == "zenity" ]]; then
+            zenity --error --title="Epoch Update error" --text="$msg"
+        fi
     fi
 }
 
 function gui_progress_update() {
-    if [[ "$GUI" -eq 0 || -z "$GUI_PIPE" ]]; then
+    if [[ -z "$GUI_MODE" || -z "$GUI_PIPE" ]]; then
         return
     fi
     echo "${1}" >&3
 }
 
 function gui_status_update() {
-    if [[ "$GUI" -eq 0 || -z "$GUI_PIPE" ]]; then
+    if [[ -z "$GUI_MODE" || -z "$GUI_PIPE" ]]; then
         return
     fi
     echo "#${1}" >&3
 }
 
+function notify_failure() {
+    local msg="$1"
+    if [[ "$NOTIFICATIONS" -eq 1 ]]; then
+        notify-send -u critical -t 5000 "Epoch Update Failed" "$msg"
+    fi
+}
+
+function notify_status() {
+    local msg="$1"
+    if [[ "$NOTIFICATIONS" -eq 1 ]]; then
+        notify-send -u normal -t 5000 "Epoch Update" "$msg"
+    fi
+}
+
 function error() {
     local msg="$1"
     gui_error "$msg"
+    notify_failure "$msg"
     echo "Error: $msg"
 }
 
@@ -95,20 +135,6 @@ function check_command() {
     if ! command -v "$cmd" &>/dev/null; then
         error "Required command '$cmd' not found. Please install it."
         exit 1
-    fi
-}
-
-function notify_failure() {
-    local msg="$1"
-    if [[ "$HEADLESS" -eq 0 && -n "$NOTIFY_SEND" && ! -t 0 ]]; then
-        "$NOTIFY_SEND" -u critical -t 5000 "Epoch Update Failed" "$msg"
-    fi
-}
-
-function notify_status() {
-    local msg="$1"
-    if [[ "$HEADLESS" -eq 0 && -n "$NOTIFY_SEND" && ! -t 1 ]]; then
-        "$NOTIFY_SEND" -u normal -t 5000 "Epoch Update" "$msg"
     fi
 }
 
@@ -134,7 +160,6 @@ function cleanup() {
     
     [[ -n "$CURL_PID" ]] && kill "$CURL_PID" 2>/dev/null || true
     [[ -n "$GUI_PID" ]] && kill "$GUI_PID" 2>/dev/null || true
-    [[ -n "$GUI_WATCHER_PID" ]] && kill "$GUI_WATCHER_PID" 2>/dev/null || true
     [[ -n "${GUI_PIPE:-}" && -p "$GUI_PIPE" ]] && rm -f "$GUI_PIPE" || true
     [[ -f "$TMP_PATH" ]] && rm -f "$TMP_PATH" || true
     [[ -f "$TMP_MANIFEST" ]] && rm -f "$TMP_MANIFEST" || true
@@ -165,11 +190,6 @@ trap 'on_sighup' SIGHUP
 
 # Check available commands
 check_command curl
-
-if [[ "$GUI" -eq 1 ]] && ! command -v zenity &>/dev/null; then
-    error "--gui was specified but Zenity is not installed."
-    exit 1
-fi
 
 # Ensure jq exists, either as defined by the env var or in $PATH.
 if [[ -n "${JQ:-}" ]]; then
@@ -203,7 +223,7 @@ if ! find "$WOW_DIR" -maxdepth 1 -type f -iname 'Wow.exe' | grep -q .; then
 fi
 
 # Launch progress bar GUI
-if [[ "$GUI" -eq 1 ]]; then
+if [[ -n "$GUI_MODE" ]]; then
     GUI_PIPE=$(mktemp -u /tmp/epoch-update-fifo.XXXXXX)
     mkfifo "$GUI_PIPE"
 
@@ -300,7 +320,7 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
     SUCCESS=0
     CURRENT_DOWNLOADED=0
     
-    if [[ "$GUI" -eq 1 ]]; then
+    if [[ -n "$GUI_MODE" ]]; then
         monitor_progress() {
             while :; do
                 CURRENT_DOWNLOADED=$(stat -c%s "$TMP_PATH" 2>/dev/null || echo 0)
@@ -347,7 +367,7 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
         fi
     done
     
-    if [[ "$GUI" -eq 1 ]]; then
+    if [[ -n "$GUI_MODE" ]]; then
         kill "$MONITOR_PID" 2>/dev/null || true
         TOTAL_DOWNLOADED=$((TOTAL_DOWNLOADED + FILE_SIZE))
         gui_progress_update "$((TOTAL_DOWNLOADED * 100 / TOTAL_DOWNLOAD_SIZE))"
@@ -363,7 +383,7 @@ echo ""
 echo "$UPDATED files updated."
 echo "$CURRENT files already up to date."
 
-if [[ "$GUI" -eq 1 ]]; then
+if [[ -n "$GUI_MODE" ]]; then
     gui_progress_update "100"
     gui_status_update "Done!"
 fi
