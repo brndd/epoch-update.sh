@@ -6,7 +6,9 @@ trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with 
 HEADLESS=0
 DRY_RUN=0
 GUI_MODE=""
+GUI_FALLBACK=0
 NOTIFICATIONS=0
+
 WOW_DIR="${WOW_DIR:-$(pwd)}"
 MANIFEST_URL="https://updater.project-epoch.net/api/v2/manifest"
 TMP_PATH="" #global so we can delete it in cleanup if needed
@@ -29,6 +31,9 @@ Options:
   --dry-run         Check files but do not download or modify anything.
   --headless        Suppress progress bars from curl.
   --gui             Enable GUI progress bar and errors using Zenity.
+  --gui-fallback    If --gui is specified but Zenity is not installed,
+                    fall back to notify-send. If notify-send is not
+                    installed, work silently.
   --notifications   Enable desktop notifications via notify-send for errors
                     and available updates.
   -h, --help        Show this help message and exit.
@@ -45,27 +50,15 @@ for arg in "$@"; do
         --dry-run)
             DRY_RUN=1
             ;;
+        --gui-fallback)
+            GUI_FALLBACK=1
+            ;;
         --gui)
-            if ! command -v zenity &>/dev/null; then
-                error "--gui was specified but Zenity is not installed."
-                exit 1
-            fi
             GUI_MODE="zenity"
             ;;
-#         --gui=*)
-#             MODE="${arg#--gui=}"
-#             if [[ "$MODE" == "zenity" ]] && ! command -v zenity &>/dev/null; then
-#                 error "--gui=zenity was specified but Zenity is not installed."
-#                 exit 1
-#             else
-#                 error "Unknown --gui mode: $MODE"
-#                 exit 1
-#             fi
-#             GUI_MODE="$MODE"
-#             ;;
         --notifications)
             if ! command -v notify-send &>/dev/null; then
-                error "--notifications specified but notify-send is not installed."
+                echo "--notifications specified but notify-send is not installed."
                 exit 1
             fi
             NOTIFICATIONS=1
@@ -84,6 +77,25 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+#Process interdependent flags
+if [[ -n "$GUI_MODE" ]]; then
+    if ! command -v zenity &>/dev/null; then
+        if [[ "$GUI_FALLBACK" -eq 1 ]]; then
+            if command -v notify-send &>/dev/null; then
+                echo "--gui --gui-fallback specified and Zenity not installed; falling back to notify-send"
+                NOTIFICATIONS=1
+                GUI_MODE=""
+            else
+                echo "--gui --gui-fallback specified and neither Zenity nor notify-send installed; operating silently"
+                GUI_MODE=""
+            fi
+        else
+            echo "--gui was specified but Zenity is not installed."
+            exit 1
+        fi
+    fi
+fi
 
 function gui_error() {
     local msg="$1"
