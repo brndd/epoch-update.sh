@@ -28,7 +28,7 @@ Usage: $0 [options]
 Options:
   --dry-run         Check files but do not download or modify anything.
   --headless        Suppress progress bars from curl.
-  --gui[=MODE]      Enable GUI progress bar. Supported modes:
+  --gui[=MODE]      Enable GUI progress bar and errors. Supported modes:
                         - zenity (default)
   --notifications   Enable desktop notifications via notify-send for errors
                     and available updates.
@@ -88,25 +88,27 @@ done
 
 function gui_error() {
     local msg="$1"
-    if [[ -n "$GUI_MODE" ]]; then
-        if [[ "$GUI_MODE" == "zenity" ]]; then
-            zenity --error --title="Epoch Update error" --text="$msg"
-        fi
+    if [[ "$GUI_MODE" == "zenity" ]]; then
+        zenity --error --title="Epoch Update error" --text="$msg"
     fi
 }
 
 function gui_progress_update() {
-    if [[ -z "$GUI_MODE" || -z "$GUI_PIPE" ]]; then
+    if [[ -z "$GUI_MODE" ]]; then
         return
     fi
-    echo "${1}" >&3
+    if [[ "$GUI_MODE" == "zenity" && -n "$GUI_PIPE" ]]; then
+        echo "${1}" >&3
+    fi
 }
 
 function gui_status_update() {
-    if [[ -z "$GUI_MODE" || -z "$GUI_PIPE" ]]; then
+    if [[ -z "$GUI_MODE" ]]; then
         return
     fi
-    echo "#${1}" >&3
+    if [[ "$GUI_MODE" == "zenity" && -n "GUI_PIPE" ]]; then
+        echo "#${1}" >&3
+    fi
 }
 
 function notify_failure() {
@@ -149,6 +151,19 @@ function hash_file() {
 
 function bytes_to_mb() {
     awk "BEGIN {printf \"%.2f\", $1 / 1024 / 1024 }"
+}
+
+function create_gui() {
+    if [[ "$GUI_MODE" == "zenity" ]]; then
+        GUI_PIPE=$(mktemp -u /tmp/epoch-update-fifo.XXXXXX)
+        mkfifo "$GUI_PIPE"
+
+        zenity --progress --title="Epoch Updater" --percentage=0 --auto-close --auto-kill --time-remaining <"$GUI_PIPE" &
+        GUI_PID=$!
+
+        #gotta do this to keep the fifo open between echoes... three hours of debugging
+        exec 3> "$GUI_PIPE"
+    fi
 }
 
 CLEANED_UP=0
@@ -224,14 +239,7 @@ fi
 
 # Launch progress bar GUI
 if [[ -n "$GUI_MODE" ]]; then
-    GUI_PIPE=$(mktemp -u /tmp/epoch-update-fifo.XXXXXX)
-    mkfifo "$GUI_PIPE"
-
-    zenity --progress --title="Epoch Updater" --percentage=0 --auto-close --auto-kill --time-remaining <"$GUI_PIPE" &
-    GUI_PID=$!
-
-    #gotta do this to keep the fifo open between echoes... three hours of debugging
-    exec 3> "$GUI_PIPE"
+    create_gui
 fi
 
 TMP_MANIFEST=$(mktemp /tmp/epoch_manifest.XXXXXX.json)
