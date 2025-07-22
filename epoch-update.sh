@@ -342,7 +342,7 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
     CURRENT_DOWNLOADED=0
     
     if [[ -n "$GUI_MODE" ]]; then
-        monitor_progress() {
+        (
             while :; do
                 CURRENT_DOWNLOADED=$(stat -c%s "$TMP_PATH" 2>/dev/null || echo 0)
                 NOW_DOWNLOADED=$((TOTAL_DOWNLOADED + CURRENT_DOWNLOADED))
@@ -352,9 +352,7 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
                 gui_status_update "($((UPDATED + 1))/$NUM_TO_UPDATE) Downloading $FILE_PATH...\nOverall progress: $NOW_DOWNLOADED_MB / $SIZE_MB MiB"
                 sleep 0.2
             done
-        }
-        
-        monitor_progress &
+        ) &
         MONITOR_PID=$!
     fi
     
