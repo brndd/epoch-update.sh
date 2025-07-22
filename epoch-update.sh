@@ -166,7 +166,7 @@ function bytes_to_mb() {
 
 function create_gui() {
     if [[ "$GUI_MODE" == "zenity" ]]; then
-        GUI_PIPE=$(mktemp -u /tmp/epoch-update-fifo.XXXXXX)
+        GUI_PIPE=$(mktemp -u --tmpdir epoch-update-fifo.XXXXXX)
         mkfifo "$GUI_PIPE"
 
         zenity --progress --title="Epoch Updater" --percentage=0 --auto-close --auto-kill --time-remaining <"$GUI_PIPE" &
@@ -255,7 +255,7 @@ if [[ -n "$GUI_MODE" ]]; then
     create_gui
 fi
 
-TMP_MANIFEST=$(mktemp /tmp/epoch_manifest.XXXXXX.json)
+TMP_MANIFEST=$(mktemp --tmpdir epoch_manifest.XXXXXX.json)
 echo "Downloading manifest..."
 gui_status_update "Downloading manifest..."
 gui_progress_update "0"
