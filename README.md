@@ -4,6 +4,14 @@ A ~~simple~~ updater bash script for Project Epoch to replace the official Elect
 
 The script does basically the exact same thing the official launcher does. It fetches the same manifest.json the official updater does, compares local file hashes to the hashes in the manifest, and downloads any files that do not match from the Project Epoch CDN URLs specified in the manifest.
 
+**Main features:**
+
+- Can run as a simple CLI updater (`./epoch-update.sh` in WoW directory with no arguments)
+- ...or diplay a GUI progress bar (`./epoch-update.sh --gui`)
+- ...or display a GUI progress bar and then launch the game with Wine (`./epoch-update.sh --gui -- wine Wow.exe`)
+- ...or as a Lutris command prefix to automatically update before launching the game (right click game > Configure > System options > set "Command prefix" to `/path/to/epoch-update.sh --gui --gui-fallback --` — the install scripts do this for you)
+- ...or as a Steam launch shim to automatically update before launching the game (right click game > Properties > set "Launch Options" to `path/to/epoch-update.sh --gui -- %command%`)
+
 ## Quickstart
 
 1. Make sure `jq` and `curl` are available (install them from your package manager if they aren't).
