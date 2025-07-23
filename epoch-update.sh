@@ -315,7 +315,6 @@ else
     exit 1
 fi
 
-
 # Check for either md5sum or md5 (macOS)
 MD5_CMD=""
 if command -v md5sum &>/dev/null; then
@@ -338,6 +337,7 @@ if [[ -n "$GUI_MODE" ]]; then
     create_gui
 fi
 
+# Download manifest
 TMP_MANIFEST=$(mktemp --tmpdir epoch_manifest.XXXXXX.json)
 echo "Downloading manifest..."
 gui_status_update "Downloading manifest..."
@@ -356,6 +356,8 @@ fi
 FILE_COUNT=$("$JQ" '.Files | length' "$TMP_MANIFEST")
 echo "Found $FILE_COUNT files in manifest."
 
+
+# Determine which files need to be updated
 UPDATED=0
 CURRENT=0
 TOTAL_DOWNLOAD_SIZE=0
@@ -363,7 +365,6 @@ declare -a TO_UPDATE=()
 declare -A FILE_URLS
 
 gui_status_update "Checking files..."
-# First pass: Determine which files need to be updated
 for i in $(seq 0 $((FILE_COUNT - 1))); do
     FILE_PATH=$("$JQ" -r ".Files[$i].Path" "$TMP_MANIFEST")
     EXPECTED_HASH=$("$JQ" -r ".Files[$i].Hash" "$TMP_MANIFEST")
@@ -406,11 +407,10 @@ if [[ "$NUM_TO_UPDATE" -gt 0 ]]; then
     notify_status "$NUM_TO_UPDATE file updates (size: $SIZE_MB MiB) are being downloaded."
 fi
 
+
+# Download updated files
 gui_status_update "Downloading files..."
-
-# Second pass: Download updated files
 TOTAL_DOWNLOADED=0
-
 for FILE_PATH in "${TO_UPDATE[@]}"; do
     LOCAL_PATH="$WOW_DIR/$FILE_PATH"
     TMP_PATH="${LOCAL_PATH}.part"
