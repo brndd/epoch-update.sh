@@ -22,14 +22,17 @@ The script can work both as a standalone updater (default), for launching a comm
 Usage: ./epoch-update.sh [options] [-- command [args...]]
 
 Options:
+  --curl-progress   Enable curl command-line progress bars.
+  --curl-silent     Run curl with --silent --show-error.
   --dry-run         Check files but do not download or modify anything.
-  --headless        Suppress progress bars from curl.
   --gui             Enable GUI progress bar and errors using Zenity.
   --gui-fallback    If --gui is specified but Zenity is not installed,
                     fall back to notify-send. If notify-send is not
                     installed, work silently.
+  --headless        (deprecated) Synonymous to --curl-silent.
   --notifications   Enable desktop notifications via notify-send for errors
                     and available updates.
+  -s, --silent      Suppress non-error output. Implies --curl-silent.
   -h, --help        Show this help message and exit.
 
 Environment Variables:
@@ -44,11 +47,14 @@ Command Execution:
 
   This will run the updater first, and then launch the given command only
   if the update completes successfully.
+
 ```
 
 ## With Lutris
 
-The best way to use the script with Lutris is to set it as the "Command prefix" under the "System options" of the game configuration, like so: `/path/to/epoch-update.sh --gui --headless --`
+The best way to use the script with Lutris is to set it as the "Command prefix" under the "System options" of the game configuration, like so:
+
+`/path/to/epoch-update.sh --gui --gui --gui-fallback --`
 
 This way Lutris will first start the script, which will handle any updates and display its GUI and then launch the game seamlessly.
 
@@ -56,7 +62,9 @@ You may have to specify the `WOW_DIR` environment variable under the "System opt
 
 ## With Steam
 
-The script can work as a Steam launch shim by setting the game's launch options to `/path/to/epoch-update.sh -- %command%`. To set this, right-click the game, select Properties, and insert the command into the Launch Options box.
+The script can work as a Steam launch shim by setting the game's launch options to run the script. To do this, right-click the game, select Properties, and insert the command into the Launch Options box, and insert (replacing the path with the actual path of the script):
+
+`/path/to/epoch-update.sh --gui --gui-fallback -- %command%`
 
 An advanced example that also uses Gamemode and Gamescope, enables update GUI, and passes -console as a command line parameter to the game:
 
