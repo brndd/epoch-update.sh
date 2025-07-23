@@ -6,8 +6,7 @@ trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with 
 # Support launching as a Steam shim (/path/to/script.sh -- %command%)
 # What this does:
 # - checks if SteamLaunch is in args
-# - If yes, shift this script and all its arguments to
-#   2 positions after SteamLaunch
+# - If yes, shift this script and all its arguments to positions after SteamLaunch
 # So an invocation like
 # script.sh --gui -- steam-launch-wrapper -- reaper SteamLaunch AppId=123 -- game.exe --debug
 # Becomes
@@ -166,7 +165,9 @@ function gui_progress_update() {
         return
     fi
     if [[ "$GUI_MODE" == "zenity" && -n "$GUI_PIPE" ]]; then
-        echo "${1}" >&"$GUI_FD"
+        trap '' SIGPIPE
+        { echo "${1}" >&"$GUI_FD"; } 2>/dev/null || true
+        trap - SIGPIPE
     fi
 }
 
@@ -175,7 +176,9 @@ function gui_status_update() {
         return
     fi
     if [[ "$GUI_MODE" == "zenity" && -n "$GUI_PIPE" ]]; then
-        echo "#${1}" >&"$GUI_FD"
+        trap '' SIGPIPE
+        { echo "#${1}" >&"$GUI_FD"; } 2>/dev/null || true
+        trap - SIGPIPE
     fi
 }
 
