@@ -32,7 +32,8 @@ for i in "${!args[@]}"; do
     fi
 done
 
-HEADLESS=0
+CURL_PROGRESS=0
+CURL_SILENT=0
 DRY_RUN=0
 GUI_MODE=""
 GUI_FALLBACK=0
@@ -59,12 +60,14 @@ function usage() {
 Usage: $0 [options] [-- command [args...]]
 
 Options:
+  --curl-progress   Enable curl command-line progress bars.
+  --curl-silent     Run curl with --silent --show-error.
   --dry-run         Check files but do not download or modify anything.
-  --headless        Suppress progress bars from curl.
   --gui             Enable GUI progress bar and errors using Zenity.
   --gui-fallback    If --gui is specified but Zenity is not installed,
                     fall back to notify-send. If notify-send is not
                     installed, work silently.
+  --headless        (deprecated) Synonymous to --curl-silent.
   --notifications   Enable desktop notifications via notify-send for errors
                     and available updates.
   -h, --help        Show this help message and exit.
@@ -104,6 +107,12 @@ done
 # Parse script arguments
 for arg in "${SCRIPT_ARGS[@]}"; do
     case "$arg" in
+        --curl-progress)
+            CURL_PROGRESS=1
+            ;;
+        --curl-silent)
+            CURL_SILENT=1
+            ;;
         --dry-run)
             DRY_RUN=1
             ;;
@@ -121,7 +130,7 @@ for arg in "${SCRIPT_ARGS[@]}"; do
             NOTIFICATIONS=1
             ;;
         --headless)
-            HEADLESS=1
+            CURL_SILENT=1
             ;;
         -h|--help)
             usage
@@ -441,10 +450,13 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
     
     for URL in "${URLS[@]}"; do
         echo "Attempting $URL..."
-        if [[ "$HEADLESS" -eq 1 ]]; then
-            CURL_FLAGS=(--silent --show-error --fail --location)
-        else
-            CURL_FLAGS=(--progress-bar --fail --location)
+        
+        CURL_FLAGS=(--fail --location)
+        if [[ "$CURL_PROGRESS" -eq 1 ]]; then
+            CURL_FLAGS+=(--progress-bar)
+        fi
+        if [[ "$CURL_SILENT" -eq 1 ]]; then
+            CURL_FLAGS+=(--silent --show-error)
         fi
         
         curl "${CURL_FLAGS[@]}" "$URL" -o "$TMP_PATH" &
