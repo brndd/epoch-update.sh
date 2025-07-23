@@ -1,7 +1,48 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
+
 trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with status $?"; echo "$msg"; gui_error "$msg"; exit 1' ERR
+
+# Support launching as a Steam shim (/path/to/script.sh -- %command%)
+# What this does:
+# - checks if SteamLaunch is in args
+# - If yes, shift this script and all its arguments to
+#   2 positions after SteamLaunch
+# So an invocation like
+# script.sh --gui -- steam-launch-wrapper -- reaper SteamLaunch AppId=123 -- game.exe --debug
+# Becomes
+# steam-launch-wrapper -- reaper SteamLaunch AppId=123 -- env "ORIGINAL_LD_PRELOAD=$LD_PRELOAD" LD_PRELOAD= script.sh --gui -- game.exe --debug
+args=("$@")
+echo "args: ${args[*]}"
+for i in "${!args[@]}"; do
+    if [[ "${args[$i]}" == "SteamLaunch" ]]; then
+        for j in "${!args[@]}"; do
+            if [[ "${args[$j]}" == "--" ]]; then
+                script_args=("${args[@]:0:$((j + 1))}")
+                other_args=("${args[@]:$((j + 1))}")
+                echo "Script args: ${script_args[*]}"
+                echo "other args: ${other_args[*]}"
+                
+                insert_pos=$((i + 3 - ${#script_args[@]}))
+                new_args=(
+                    "${other_args[@]:0:$insert_pos}"
+                    "env"
+                    #gamemoderun's LD_PRELOAD can corrupt the script in bizarre ways
+                    #and is commonly used with Steam
+                    "ORIGINAL_LD_PRELOAD=$LD_PRELOAD"
+                    "LD_PRELOAD="
+                    "$0"
+                    "${script_args[@]}"
+                    "${other_args[@]:$insert_pos}"
+                )
+                
+                echo "new args: ${new_args[*]}"
+                exec "${new_args[@]}"
+                exit
+            fi
+        done
+    fi
+done
 
 HEADLESS=0
 DRY_RUN=0
@@ -25,7 +66,7 @@ CURL_PID=""
 
 function usage() {
     cat <<EOF
-Usage: $0 [options]
+Usage: $0 [options] [-- command [args...]]
 
 Options:
   --dry-run         Check files but do not download or modify anything.
@@ -41,11 +82,37 @@ Options:
 Environment Variables:
   WOW_DIR           Path to the World of Warcraft directory (default: current directory).
   JQ                Path to the jq binary to be used over system jq.
+  
+Command Execution:
+  You can optionally specify a command to run after a successful update
+  by using '--' followed by the command and its arguments. For example:
+
+      $0 --gui -- /opt/wow/Wow.exe -console
+
+  This will run the updater first, and then launch the given command only
+  if the update completes successfully.
+
 EOF
 }
 
-# Parse arguments
+# Separate script arguments from executed command
+CMD_ARGS=()
+SCRIPT_ARGS=()
+SEEN_DOUBLE_DASH=0
 for arg in "$@"; do
+    if [[ "$arg" == "--" ]]; then
+        SEEN_DOUBLE_DASH=1
+        continue
+    fi
+    if [[ "$SEEN_DOUBLE_DASH" -eq 1 ]]; then
+        CMD_ARGS+=("$arg")
+    else
+        SCRIPT_ARGS+=("$arg")
+    fi
+done
+
+# Parse script arguments
+for arg in "${SCRIPT_ARGS[@]}"; do
     case "$arg" in
         --dry-run)
             DRY_RUN=1
@@ -405,6 +472,14 @@ echo "$CURRENT files already up to date."
 if [[ -n "$GUI_MODE" ]]; then
     gui_progress_update "100"
     gui_status_update "Done!"
+fi
+
+if [[ "${#CMD_ARGS[@]}" -gt 0 ]]; then
+    echo "Running post-update command: ${CMD_ARGS[*]}"
+    if [[ -n "$ORIGINAL_LD_PRELOAD" ]]; then
+        export LD_PRELOAD="$ORIGINAL_LD_PRELOAD"
+    fi
+    exec "${CMD_ARGS[@]}"
 fi
 
 exit $E_SUCCESS
