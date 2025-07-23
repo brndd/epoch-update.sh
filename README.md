@@ -2,27 +2,65 @@
 
 A simple updater bash script for Project Epoch to replace the official Electron-based updater, which can work poorly under Wine.
 
-The script does basically the exact same thing the official launcher does, but without a GUI. It fetches the same manifest.json the official updater does, compares local file hashes to the hashes in the manifest, and downloads any files that do not match from the Project Epoch CDN URLs specified in the manifest.
+The script does basically the exact same thing the official launcher does. It fetches the same manifest.json the official updater does, compares local file hashes to the hashes in the manifest, and downloads any files that do not match from the Project Epoch CDN URLs specified in the manifest.
+
+## Quick start
+
+1. Make sure `jq` and `curl` are available (install them from your package manager if they aren't).
+  - If you want a graphical progress bar, install `zenity` and pass the `--gui` parameter.
+  - If you want the script to send desktop notifications when files are updated or if updates fail, install `notify-send` and pass the `--notifications` parameter.
+  - Alternatively you can download a static jq binary from https://github.com/jqlang/jq/releases and specify its path using the `JQ=/path/to/jq` before running the script.
+2. Download [epoch-update.sh](https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/epoch-update.sh) (right click > Save as) and place it in your Project Epoch installation directory (next to WoW.exe). Alternatively place anywhere and specify the WOW_DIR environment variable before running.
+3. `chmod +x epoch-update.sh` to make the script executable.
+4. Run the script. If you're unsure about it working, you can pass `--dry-run` to just check if files need updating but not download anything. You can also pass `--help` to see the options.
+
+The script can work both as a standalone updater (default), for launching a command, and as a Steam launch shim. Read below for more details.
 
 ## Usage
 
+```
+Usage: ./epoch-update.sh [options] [-- command [args...]]
 
-1. Make sure `jq` and `curl` are available (install them from your package manager if they aren't). If you want the script to send desktop notifications when files are updated or if updates fail, install `notify-send` too. Alternatively you can download a static jq binary from https://github.com/jqlang/jq/releases and specify its path using the `JQ=/path/to/jq` before running the script.
-2. Download [epoch-update.sh](https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/epoch-update.sh) (right click > Save as) and place it in your Project Epoch installation directory (next to WoW.exe). Alternatively place anywhere and specify the WOW_DIR environment variable before running.
-3. `chmod +x epoch-update.sh` to make the script executable.
-4. Run the script. If you're unsure about it working, you can pass `--dry-run` to just check if files need updating but not download anything. You can also pass `--help` to see the (limited) options.
+Options:
+  --dry-run         Check files but do not download or modify anything.
+  --headless        Suppress progress bars from curl.
+  --gui             Enable GUI progress bar and errors using Zenity.
+  --gui-fallback    If --gui is specified but Zenity is not installed,
+                    fall back to notify-send. If notify-send is not
+                    installed, work silently.
+  --notifications   Enable desktop notifications via notify-send for errors
+                    and available updates.
+  -h, --help        Show this help message and exit.
 
-The intended usage is to run this as a Lutris pre-launch script. When ran non-interactively, the script will try to use notify-send to pop up a desktop notification when files are updated and if updates fail. This is because Lutris doesn't support aborting launching the game if the pre-launch script fails.
+Environment Variables:
+  WOW_DIR           Path to the World of Warcraft directory (default: current directory).
+  JQ                Path to the jq binary to be used over system jq.
+  
+Command Execution:
+  You can optionally specify a command to run after a successful update
+  by using '--' followed by the command and its arguments. For example:
 
-# steam-launch.sh
+      ./epoch-update.sh --gui -- wine /opt/wow/Wow.exe -console
 
-This is a launch shim that lets you update the game when launching it from Steam, if you have added the game to your library as a non-Steam game.
+  This will run the updater first, and then launch the given command only
+  if the update completes successfully.
+```
 
-1. Download [epoch-update.sh](https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/epoch-update.sh) and [steam-launch.sh](https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/steam-launch.sh) (right click > Save as) and place them into the game directory (next to WoW.exe)
-2. Make the scripts executable: `chmod +x epoch-update.sh steam-launch.sh`
-3. Set Steam launch options to: `/full/path/to/steam-launch.sh %command%` (replacing the path with the actual path to the script)
+## With Lutris
 
-If your system doesn't have jq available in the repository or if installing it is difficult, download the latest jq binary [from here](https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64), place it anywhere, make it executable (`chmod +x jq-linux-amd64`), and then set the Steam launch options to: `JQ="/path/to/jq-linux-amd64" /path/to/steam-launch.sh %command%` (replacing the paths with the actual paths).
+The best way to use the script with Lutris is to set it as the "Command prefix" under the "System options" of the game configuration, like so: `/path/to/epoch-update.sh --gui --headless --`
+
+This way Lutris will first start the script, which will handle any updates and display its GUI and then launch the game seamlessly.
+
+You may have to specify the `WOW_DIR` environment variable under the "System options" of the game configuration in Lutris if the script has trouble finding Wow.exe (Lutris sometimes gives it a strange working directory).
+
+## With Steam
+
+The script can work as a Steam launch shim by setting the game's launch options to `/path/to/epoch-update.sh -- %command%`. To set this, right-click the game, select Properties, and insert the command into the Launch Options box.
+
+An advanced example that also uses Gamemode and Gamescope, enables update GUI, and passes -console as a command line parameter to the game:
+
+`gamemoderun gamescope -w 2560 -h 1440 -W 2560 -H 1440 -f -- /path/to/epoch-update.sh --gui -- %command% -console`
 
 
 # Lutris install scripts
