@@ -51,6 +51,7 @@ E_HASH_MISMATCH=4
 GUI_PIPE=""
 GUI_PID=""
 GUI_FD=""
+GUI_STATUS_FILE=""
 CURL_PID=""
 
 function usage() {
@@ -228,8 +229,17 @@ function create_gui() {
     if [[ "$GUI_MODE" == "zenity" ]]; then
         GUI_PIPE=$(mktemp -u --tmpdir epoch-update-fifo.XXXXXX)
         mkfifo "$GUI_PIPE"
+        GUI_STATUS_FILE=$(mktemp --tmpdir epoch-gui-status.XXXXXX)
 
-        zenity --progress --title="Epoch Updater" --percentage=0 --auto-close --auto-kill --time-remaining <"$GUI_PIPE" &
+        PARENT_SHELL=$$
+        (
+            set +e
+            zenity --progress --title="Epoch Updater" --percentage=0 --auto-close  --time-remaining <"$GUI_PIPE"
+            ZENITY_EXIT="$?"
+            set -e
+            echo "$ZENITY_EXIT" > "$GUI_STATUS_FILE"
+            kill -s SIGUSR1 $PARENT_SHELL
+        ) &
         GUI_PID=$!
 
         #gotta do this to keep the fifo open between echoes... three hours of debugging
@@ -246,11 +256,12 @@ function cleanup() {
     
     [[ -n "$CURL_PID" ]] && kill "$CURL_PID" 2>/dev/null || true
     [[ -n "$GUI_PID" ]] && kill "$GUI_PID" 2>/dev/null || true
+    [[ -f "$GUI_STATUS_FILE" ]] && rm -f "$GUI_STATUS_FILE" || true
     [[ -n "${GUI_PIPE:-}" && -p "$GUI_PIPE" ]] && rm -f "$GUI_PIPE" || true
     [[ -f "$TMP_PATH" ]] && rm -f "$TMP_PATH" || true
     [[ -f "$TMP_MANIFEST" ]] && rm -f "$TMP_MANIFEST" || true
     
-    if [[ "$GUI_MODE" == "zenity" ]]; then
+    if [[ "$GUI_MODE" == "zenity" && -n "$GUI_FD" ]]; then
         #close fifo
         exec {GUI_FD}>&-
     fi
@@ -270,10 +281,22 @@ function on_sighup() {
     cleanup
     exit 129
 }
+#Called by Zenity subshell when Zenity is closed
+function on_sigusr1() {
+    if [[ "$GUI_MODE" == "zenity" && -f "$GUI_STATUS_FILE" ]]; then
+        ZENITY_EXIT_CODE=$(<"$GUI_STATUS_FILE")
+        if [[ "ZENITY_EXIT_CODE" -eq 1 ]]; then
+            echo "User clicked Cancel." >&2
+            cleanup
+            exit 1
+        fi
+    fi
+}
 trap 'cleanup' EXIT
 trap 'on_sigint' SIGINT
 trap 'on_sigterm' SIGTERM
 trap 'on_sighup' SIGHUP
+trap 'on_sigusr1' SIGUSR1
 
 
 # Check available commands
