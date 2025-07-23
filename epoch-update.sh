@@ -464,6 +464,8 @@ if [[ -n "$GUI_MODE" ]]; then
     gui_status_update "Done!"
 fi
 
+cleanup
+
 if [[ "${#CMD_ARGS[@]}" -gt 0 ]]; then
     echo "Running post-update command: ${CMD_ARGS[*]}"
     exec "${CMD_ARGS[@]}"
