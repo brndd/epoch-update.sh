@@ -30,6 +30,7 @@ Options:
                     fall back to notify-send. If notify-send is not
                     installed, work silently.
   --headless        (deprecated) Synonymous to --curl-silent.
+  --nofail          Launch the command even if updates fail for a known reason.
   --notifications   Enable desktop notifications via notify-send for errors
                     and available updates.
   -s, --silent      Suppress non-error output. Implies --curl-silent.

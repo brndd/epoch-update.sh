@@ -6,6 +6,7 @@ CURL_SILENT=0
 DRY_RUN=0
 GUI_MODE=""
 GUI_FALLBACK=0
+NOFAIL=0
 NOTIFICATIONS=0
 SILENT=0
 
@@ -16,6 +17,7 @@ TMP_MANIFEST=""
 
 GUI_PIPE=""
 GUI_PID=""
+GUI_SUBSHELL_PID=""
 GUI_FD=""
 GUI_STATUS_FILE=""
 CURL_PID=""
@@ -29,6 +31,21 @@ function gui_error() {
     local msg="$1"
     if [[ "$GUI_MODE" == "zenity" ]]; then
         zenity --error --title="Epoch Update error" --text="$msg" &
+    fi
+}
+
+# Error, but ask the user if they want to launch anyway if there's a command
+function gui_error_question() {
+    local msg="$1"
+    if [[ "${#CMD_ARGS[@]}" -eq 0 ]]; then
+        gui_error "$msg"
+        return
+    fi
+    if [[ "$GUI_MODE" == "zenity" ]]; then
+        if zenity --question --title="Epoch Update error"\
+        --text="$msg\n\nLaunch anyway?"; then
+            do_launch
+        fi
     fi
 }
 
@@ -60,12 +77,27 @@ function stdout() {
 
 function error() {
     local msg="$1"
-    gui_error "$msg"
-    notify_failure "$msg"
-    stderr "Error: $msg"
+    if [[ "$NOFAIL" -eq 1 ]]; then
+        stderr "Error: $msg"
+        notify_failure "$msg"
+        gui_error "$msg"
+        do_launch
+    else
+        stderr "Error: $msg"
+        notify_failure "$msg"
+        gui_error_question "$msg"
+    fi
 }
 
-trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with status $?"; error "$msg"; exit 1' ERR
+# Unexpected errors, not suppressed by --nofail or user confirm
+function fatal() {
+    local msg="$1"
+    stderr "Error: $msg"
+    notify_failure "$msg"
+    gui_error "$msg"
+}
+
+trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with status $?"; fatal "$msg"; exit 1' ERR
 
 # Support launching as a Steam shim (/path/to/script.sh -- %command%)
 # What this does:
@@ -109,6 +141,7 @@ Options:
                     fall back to notify-send. If notify-send is not
                     installed, work silently.
   --headless        (deprecated) Synonymous to --curl-silent.
+  --nofail          Launch the command even if updates fail for a known reason.
   --notifications   Enable desktop notifications via notify-send for errors
                     and available updates.
   -s, --silent      Suppress non-error output. Implies --curl-silent.
@@ -164,6 +197,9 @@ for arg in "${SCRIPT_ARGS[@]}"; do
         --gui)
             GUI_MODE="zenity"
             ;;
+        --nofail)
+            NOFAIL=1
+            ;;
         --notifications)
             if ! command -v notify-send &>/dev/null; then
                 stderr "--notifications specified but notify-send is not installed."
@@ -208,6 +244,18 @@ if [[ -n "$GUI_MODE" ]]; then
         fi
     fi
 fi
+
+function do_launch() {
+    if [[ "${#CMD_ARGS[@]}" -gt 0 ]]; then
+        cleanup
+        stdout "Running post-update command: ${CMD_ARGS[*]}"
+        exec "${CMD_ARGS[@]}"
+        #exec replaces the shell so below only ever run
+        #if launch fails in some strange way
+        fatal "Failed to launch command: ${CMD_ARGS[*]}"
+        exit 1
+    fi
+}
 
 function gui_progress_update() {
     if [[ -z "$GUI_MODE" ]]; then
@@ -257,20 +305,29 @@ function create_gui() {
         GUI_PIPE=$(mktemp -u --tmpdir epoch-update-fifo.XXXXXX)
         mkfifo "$GUI_PIPE"
         GUI_STATUS_FILE=$(mktemp --tmpdir epoch-gui-status.XXXXXX)
+        ZENITY_PID_FILE=$(mktemp --tmpdir epoch-zenity-pid.XXXXXX)
 
         PARENT_SHELL=$$
         (
             set +e
-            zenity --progress --title="Epoch Updater" --percentage=0 --auto-close  --time-remaining <"$GUI_PIPE"
+            zenity --progress --title="Epoch Updater" --percentage=0 --auto-close  --time-remaining <"$GUI_PIPE" &
+            ZENITY_PID=$!
+            echo "$ZENITY_PID" > "$ZENITY_PID_FILE"
+            wait "$ZENITY_PID"
             ZENITY_EXIT="$?"
             set -e
             echo "$ZENITY_EXIT" > "$GUI_STATUS_FILE"
             kill -s SIGUSR1 $PARENT_SHELL
         ) &
-        GUI_PID=$!
-
+        GUI_SUBSHELL_PID=$!
+        
         #gotta do this to keep the fifo open between echoes... three hours of debugging
         exec {GUI_FD}> "$GUI_PIPE"
+        
+        # Wait for Zenity to start and write its pid
+        while [[ ! -s "$ZENITY_PID_FILE" ]]; do sleep 0.05; done
+        GUI_PID=$(<"$ZENITY_PID_FILE")
+        rm -f "$ZENITY_PID_FILE"
     fi
 }
 
@@ -282,6 +339,7 @@ function cleanup() {
     CLEANED_UP=1
     
     [[ -n "$CURL_PID" ]] && kill "$CURL_PID" 2>/dev/null || true
+    [[ -n "$GUI_SUBSHELL_PID" ]] && kill "$GUI_SUBSHELL_PID" 2>/dev/null || true
     [[ -n "$GUI_PID" ]] && kill "$GUI_PID" 2>/dev/null || true
     [[ -f "$GUI_STATUS_FILE" ]] && rm -f "$GUI_STATUS_FILE" || true
     [[ -n "${GUI_PIPE:-}" && -p "$GUI_PIPE" ]] && rm -f "$GUI_PIPE" || true
@@ -371,10 +429,8 @@ gui_status_update "Downloading manifest..."
 gui_progress_update "0"
 curl -sSfL "$MANIFEST_URL" -o "$TMP_MANIFEST" &
 CURL_PID=$!
-wait "$CURL_PID"
-CURL_STATUS=$?
-if [[ "$CURL_STATUS" -ne 0 ]]; then
-    error "Failed to fetch manifest"
+if ! wait "$CURL_PID"; then
+    error "Failed to fetch manifest."
     exit $E_MANIFEST_FAILED
 fi
 # Normalize manifest paths to use forward slashes
@@ -457,7 +513,7 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
                 CURRENT_DOWNLOADED=$(stat -c%s "$TMP_PATH" 2>/dev/null || echo 0)
                 NOW_DOWNLOADED=$((TOTAL_DOWNLOADED + CURRENT_DOWNLOADED))
                 NOW_DOWNLOADED_MB=$(bytes_to_mb "$NOW_DOWNLOADED")
-                PERCENT=$((NOW_DOWNLOADED * 100 / TOTAL_DOWNLOAD_SIZE))
+                PERCENT=$((NOW_DOWNLOADED * 99 / TOTAL_DOWNLOAD_SIZE))
                 gui_progress_update "$PERCENT"
                 gui_status_update "($((UPDATED + 1))/$NUM_TO_UPDATE) Downloading $FILE_PATH...\nOverall progress: $NOW_DOWNLOADED_MB / $SIZE_MB MiB"
                 sleep 0.2
@@ -479,9 +535,7 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
         
         curl "${CURL_FLAGS[@]}" "$URL" -o "$TMP_PATH" &
         CURL_PID=$!
-        wait "$CURL_PID"
-        CURL_STATUS=$?
-        if [[ "$CURL_STATUS" -eq 0 ]]; then
+        if wait "$CURL_PID"; then
             NEW_HASH=$(hash_file "$TMP_PATH")
             if [[ "$NEW_HASH" == "$EXPECTED_HASH" ]]; then
                 mv -f "$TMP_PATH" "$LOCAL_PATH"
@@ -497,16 +551,16 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
             rm -f "$TMP_PATH"
         fi
     done
+
+    if [[ "$SUCCESS" -ne 1 ]]; then
+        error "Failed to update $FILE_PATH."
+        exit $E_DOWNLOAD_FAILED
+    fi
     
     if [[ -n "$GUI_MODE" ]]; then
         kill "$MONITOR_PID" 2>/dev/null || true
         TOTAL_DOWNLOADED=$((TOTAL_DOWNLOADED + FILE_SIZE))
-        gui_progress_update "$((TOTAL_DOWNLOADED * 100 / TOTAL_DOWNLOAD_SIZE))"
-    fi
-
-    if [[ "$SUCCESS" -ne 1 ]]; then
-        error "Failed to update $FILE_PATH"
-        exit $E_DOWNLOAD_FAILED
+        gui_progress_update "$((TOTAL_DOWNLOADED * 99 / TOTAL_DOWNLOAD_SIZE))"
     fi
 done
 
@@ -520,10 +574,7 @@ if [[ -n "$GUI_MODE" ]]; then
 fi
 
 cleanup
+do_launch
 
-if [[ "${#CMD_ARGS[@]}" -gt 0 ]]; then
-    stdout "Running post-update command: ${CMD_ARGS[*]}"
-    exec "${CMD_ARGS[@]}"
-fi
-
+trap '' EXIT
 exit $E_SUCCESS
