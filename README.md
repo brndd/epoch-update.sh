@@ -4,7 +4,7 @@ A simple updater bash script for Project Epoch to replace the official Electron-
 
 The script does basically the exact same thing the official launcher does. It fetches the same manifest.json the official updater does, compares local file hashes to the hashes in the manifest, and downloads any files that do not match from the Project Epoch CDN URLs specified in the manifest.
 
-## Quick start
+## Quickstart
 
 1. Make sure `jq` and `curl` are available (install them from your package manager if they aren't).
   - If you want a graphical progress bar, install `zenity` and pass the `--gui` parameter.
