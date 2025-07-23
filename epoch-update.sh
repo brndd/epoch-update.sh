@@ -77,7 +77,7 @@ Command Execution:
   You can optionally specify a command to run after a successful update
   by using '--' followed by the command and its arguments. For example:
 
-      $0 --gui -- /opt/wow/Wow.exe -console
+      $0 --gui -- wine /opt/wow/Wow.exe -console
 
   This will run the updater first, and then launch the given command only
   if the update completes successfully.
