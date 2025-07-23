@@ -11,7 +11,7 @@ trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with 
 # So an invocation like
 # script.sh --gui -- steam-launch-wrapper -- reaper SteamLaunch AppId=123 -- game.exe --debug
 # Becomes
-# steam-launch-wrapper -- reaper SteamLaunch AppId=123 -- env "ORIGINAL_LD_PRELOAD=$LD_PRELOAD" LD_PRELOAD= script.sh --gui -- game.exe --debug
+# steam-launch-wrapper -- reaper SteamLaunch AppId=123 -- script.sh --gui -- game.exe --debug
 args=("$@")
 echo "args: ${args[*]}"
 for i in "${!args[@]}"; do
@@ -26,11 +26,6 @@ for i in "${!args[@]}"; do
                 insert_pos=$((i + 3 - ${#script_args[@]}))
                 new_args=(
                     "${other_args[@]:0:$insert_pos}"
-                    "env"
-                    #gamemoderun's LD_PRELOAD can corrupt the script in bizarre ways
-                    #and is commonly used with Steam
-                    "ORIGINAL_LD_PRELOAD=$LD_PRELOAD"
-                    "LD_PRELOAD="
                     "$0"
                     "${script_args[@]}"
                     "${other_args[@]:$insert_pos}"
@@ -62,6 +57,7 @@ E_HASH_MISMATCH=4
 
 GUI_PIPE=""
 GUI_PID=""
+GUI_FD=""
 CURL_PID=""
 
 function usage() {
@@ -176,7 +172,7 @@ function gui_progress_update() {
         return
     fi
     if [[ "$GUI_MODE" == "zenity" && -n "$GUI_PIPE" ]]; then
-        echo "${1}" >&3
+        echo "${1}" >&"$GUI_FD"
     fi
 }
 
@@ -185,7 +181,7 @@ function gui_status_update() {
         return
     fi
     if [[ "$GUI_MODE" == "zenity" && -n "$GUI_PIPE" ]]; then
-        echo "#${1}" >&3
+        echo "#${1}" >&"$GUI_FD"
     fi
 }
 
@@ -240,7 +236,7 @@ function create_gui() {
         GUI_PID=$!
 
         #gotta do this to keep the fifo open between echoes... three hours of debugging
-        exec 3> "$GUI_PIPE"
+        exec {GUI_FD}> "$GUI_PIPE"
     fi
 }
 
@@ -259,7 +255,7 @@ function cleanup() {
     
     if [[ "$GUI_MODE" == "zenity" ]]; then
         #close fifo
-        exec 3>&-
+        exec {GUI_FD}>&-
     fi
 }
 function on_sigint() {
@@ -476,9 +472,6 @@ fi
 
 if [[ "${#CMD_ARGS[@]}" -gt 0 ]]; then
     echo "Running post-update command: ${CMD_ARGS[*]}"
-    if [[ -n "${ORIGINAL_LD_PRELOAD-}" ]]; then
-        export LD_PRELOAD="$ORIGINAL_LD_PRELOAD"
-    fi
     exec "${CMD_ARGS[@]}"
 fi
 
