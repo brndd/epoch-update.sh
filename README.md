@@ -1,6 +1,6 @@
 # epoch-update.sh
 
-A simple updater bash script for Project Epoch to replace the official Electron-based updater, which can work poorly under Wine.
+A ~~simple~~ updater bash script for Project Epoch to replace the official Electron-based updater, which can work poorly under Wine.
 
 The script does basically the exact same thing the official launcher does. It fetches the same manifest.json the official updater does, compares local file hashes to the hashes in the manifest, and downloads any files that do not match from the Project Epoch CDN URLs specified in the manifest.
 
