@@ -55,7 +55,8 @@ Command Execution:
       ./epoch-update.sh --gui -- wine /opt/wow/Wow.exe -console
 
   This will run the updater first, and then launch the given command only
-  if the update completes successfully.
+  if the update completes successfully. By passing --nofail, the command
+  will be executed even if updates fail.
 
 ```
 
