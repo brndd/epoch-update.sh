@@ -6,7 +6,7 @@ trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with 
 # Support launching as a Steam shim (/path/to/script.sh -- %command%)
 # What this does:
 # - checks if SteamLaunch is in args
-# - If yes, shift this script and all its arguments to positions after SteamLaunch
+# - If yes, shift this script and all its arguments to 3 positions after SteamLaunch
 # So an invocation like
 # script.sh --gui -- steam-launch-wrapper -- reaper SteamLaunch AppId=123 -- game.exe --debug
 # Becomes
@@ -413,7 +413,7 @@ gui_status_update "Downloading files..."
 TOTAL_DOWNLOADED=0
 for FILE_PATH in "${TO_UPDATE[@]}"; do
     LOCAL_PATH="$WOW_DIR/$FILE_PATH"
-    TMP_PATH="${LOCAL_PATH}.part"
+    TMP_PATH=$(mktemp "${LOCAL_PATH}.XXXXXX.part")
     URLS=(${FILE_URLS["$FILE_PATH"]})
     EXPECTED_HASH=$("$JQ" -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Hash" "$TMP_MANIFEST")
     FILE_SIZE=$("$JQ" -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Size" "$TMP_MANIFEST")
@@ -446,7 +446,6 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
         else
             CURL_FLAGS=(--progress-bar --fail --location)
         fi
-
         
         curl "${CURL_FLAGS[@]}" "$URL" -o "$TMP_PATH" &
         CURL_PID=$!
