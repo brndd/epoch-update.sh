@@ -476,7 +476,7 @@ fi
 
 if [[ "${#CMD_ARGS[@]}" -gt 0 ]]; then
     echo "Running post-update command: ${CMD_ARGS[*]}"
-    if [[ -n "$ORIGINAL_LD_PRELOAD" ]]; then
+    if [[ -n "${ORIGINAL_LD_PRELOAD-}" ]]; then
         export LD_PRELOAD="$ORIGINAL_LD_PRELOAD"
     fi
     exec "${CMD_ARGS[@]}"
