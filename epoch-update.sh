@@ -13,16 +13,12 @@ trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with 
 # Becomes
 # steam-launch-wrapper -- reaper SteamLaunch AppId=123 -- script.sh --gui -- game.exe --debug
 args=("$@")
-echo "args: ${args[*]}"
 for i in "${!args[@]}"; do
     if [[ "${args[$i]}" == "SteamLaunch" ]]; then
         for j in "${!args[@]}"; do
             if [[ "${args[$j]}" == "--" ]]; then
                 script_args=("${args[@]:0:$((j + 1))}")
-                other_args=("${args[@]:$((j + 1))}")
-                echo "Script args: ${script_args[*]}"
-                echo "other args: ${other_args[*]}"
-                
+                other_args=("${args[@]:$((j + 1))}")                
                 insert_pos=$((i + 3 - ${#script_args[@]}))
                 new_args=(
                     "${other_args[@]:0:$insert_pos}"
@@ -30,8 +26,6 @@ for i in "${!args[@]}"; do
                     "${script_args[@]}"
                     "${other_args[@]:$insert_pos}"
                 )
-                
-                echo "new args: ${new_args[*]}"
                 exec "${new_args[@]}"
                 exit
             fi
