@@ -1,7 +1,71 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with status $?"; echo "$msg"; gui_error "$msg"; exit 1' ERR
+CURL_PROGRESS=0
+CURL_SILENT=0
+DRY_RUN=0
+GUI_MODE=""
+GUI_FALLBACK=0
+NOTIFICATIONS=0
+SILENT=0
+
+WOW_DIR="${WOW_DIR:-$(pwd)}"
+MANIFEST_URL="https://updater.project-epoch.net/api/v2/manifest"
+TMP_PATH="" #global so we can delete it in cleanup if needed
+TMP_MANIFEST=""
+
+GUI_PIPE=""
+GUI_PID=""
+GUI_FD=""
+GUI_STATUS_FILE=""
+CURL_PID=""
+
+E_SUCCESS=0
+E_MANIFEST_FAILED=2
+E_DOWNLOAD_FAILED=3
+E_HASH_MISMATCH=4
+
+function gui_error() {
+    local msg="$1"
+    if [[ "$GUI_MODE" == "zenity" ]]; then
+        zenity --error --title="Epoch Update error" --text="$msg" &
+    fi
+}
+
+function notify_failure() {
+    local msg="$1"
+    if [[ "$NOTIFICATIONS" -eq 1 ]]; then
+        notify-send -u critical -t 5000 "Epoch Update Failed" "$msg"
+    fi
+}
+
+function notify_status() {
+    local msg="$1"
+    if [[ "$NOTIFICATIONS" -eq 1 ]]; then
+        notify-send -u normal -t 5000 "Epoch Update" "$msg"
+    fi
+}
+
+function stderr() {
+    local msg="$1"
+    echo "$msg" >&2
+}
+
+function stdout() {
+    if [[ "$SILENT" -eq 0 ]]; then
+        local msg="$1"
+        echo "$msg"
+    fi
+}
+
+function error() {
+    local msg="$1"
+    gui_error "$msg"
+    notify_failure "$msg"
+    stderr "Error: $msg"
+}
+
+trap 'msg="Script failed at line $LINENO: command \"$BASH_COMMAND\" exited with status $?"; error "$msg"; exit 1' ERR
 
 # Support launching as a Steam shim (/path/to/script.sh -- %command%)
 # What this does:
@@ -32,29 +96,6 @@ for i in "${!args[@]}"; do
     fi
 done
 
-CURL_PROGRESS=0
-CURL_SILENT=0
-DRY_RUN=0
-GUI_MODE=""
-GUI_FALLBACK=0
-NOTIFICATIONS=0
-
-WOW_DIR="${WOW_DIR:-$(pwd)}"
-MANIFEST_URL="https://updater.project-epoch.net/api/v2/manifest"
-TMP_PATH="" #global so we can delete it in cleanup if needed
-TMP_MANIFEST=""
-
-E_SUCCESS=0
-E_MANIFEST_FAILED=2
-E_DOWNLOAD_FAILED=3
-E_HASH_MISMATCH=4
-
-GUI_PIPE=""
-GUI_PID=""
-GUI_FD=""
-GUI_STATUS_FILE=""
-CURL_PID=""
-
 function usage() {
     cat <<EOF
 Usage: $0 [options] [-- command [args...]]
@@ -70,6 +111,7 @@ Options:
   --headless        (deprecated) Synonymous to --curl-silent.
   --notifications   Enable desktop notifications via notify-send for errors
                     and available updates.
+  -s, --silent      Suppress non-error output. Implies --curl-silent.
   -h, --help        Show this help message and exit.
 
 Environment Variables:
@@ -124,7 +166,7 @@ for arg in "${SCRIPT_ARGS[@]}"; do
             ;;
         --notifications)
             if ! command -v notify-send &>/dev/null; then
-                echo "--notifications specified but notify-send is not installed."
+                stderr "--notifications specified but notify-send is not installed."
                 exit 1
             fi
             NOTIFICATIONS=1
@@ -132,12 +174,16 @@ for arg in "${SCRIPT_ARGS[@]}"; do
         --headless)
             CURL_SILENT=1
             ;;
+        -s|--silent)
+            SILENT=1
+            CURL_SILENT=1
+            ;;
         -h|--help)
             usage
             exit 0
             ;;
         *)
-            echo "Unknown argument: $arg"
+            stderr "Unknown argument: $arg"
             usage
             exit 1
             ;;
@@ -149,26 +195,19 @@ if [[ -n "$GUI_MODE" ]]; then
     if ! command -v zenity &>/dev/null; then
         if [[ "$GUI_FALLBACK" -eq 1 ]]; then
             if command -v notify-send &>/dev/null; then
-                echo "--gui --gui-fallback specified and Zenity not installed; falling back to notify-send"
+                stdout "--gui --gui-fallback specified and Zenity not installed; falling back to notify-send"
                 NOTIFICATIONS=1
                 GUI_MODE=""
             else
-                echo "--gui --gui-fallback specified and neither Zenity nor notify-send installed; operating silently"
+                stdout "--gui --gui-fallback specified and neither Zenity nor notify-send installed; operating silently"
                 GUI_MODE=""
             fi
         else
-            echo "--gui was specified but Zenity is not installed."
+            stderr "--gui was specified but Zenity is not installed."
             exit 1
         fi
     fi
 fi
-
-function gui_error() {
-    local msg="$1"
-    if [[ "$GUI_MODE" == "zenity" ]]; then
-        zenity --error --title="Epoch Update error" --text="$msg"
-    fi
-}
 
 function gui_progress_update() {
     if [[ -z "$GUI_MODE" ]]; then
@@ -190,27 +229,6 @@ function gui_status_update() {
         { echo "#${1}" >&"$GUI_FD"; } 2>/dev/null || true
         trap - SIGPIPE
     fi
-}
-
-function notify_failure() {
-    local msg="$1"
-    if [[ "$NOTIFICATIONS" -eq 1 ]]; then
-        notify-send -u critical -t 5000 "Epoch Update Failed" "$msg"
-    fi
-}
-
-function notify_status() {
-    local msg="$1"
-    if [[ "$NOTIFICATIONS" -eq 1 ]]; then
-        notify-send -u normal -t 5000 "Epoch Update" "$msg"
-    fi
-}
-
-function error() {
-    local msg="$1"
-    gui_error "$msg"
-    notify_failure "$msg"
-    echo "Error: $msg"
 }
 
 function check_command() {
@@ -276,17 +294,17 @@ function cleanup() {
     fi
 }
 function on_sigint() {
-    echo "Terminated by SIGINT." >&2
+    stderr "Terminated by SIGINT."
     cleanup
     exit 130
 }
 function on_sigterm() {
-    echo "Terminated by SIGTERM." >&2
+    stderr "Terminated by SIGTERM."
     cleanup
     exit 143
 }
 function on_sighup() {
-    echo "Terminated by SIGHUP." >&2
+    stderr "Terminated by SIGHUP."
     cleanup
     exit 129
 }
@@ -295,7 +313,7 @@ function on_sigusr1() {
     if [[ "$GUI_MODE" == "zenity" && -f "$GUI_STATUS_FILE" ]]; then
         ZENITY_EXIT_CODE=$(<"$GUI_STATUS_FILE")
         if [[ "ZENITY_EXIT_CODE" -eq 1 ]]; then
-            echo "User clicked Cancel." >&2
+            stderr "User clicked Cancel."
             cleanup
             exit 1
         fi
@@ -348,7 +366,7 @@ fi
 
 # Download manifest
 TMP_MANIFEST=$(mktemp --tmpdir epoch_manifest.XXXXXX.json)
-echo "Downloading manifest..."
+stdout "Downloading manifest..."
 gui_status_update "Downloading manifest..."
 gui_progress_update "0"
 curl -sSfL "$MANIFEST_URL" -o "$TMP_MANIFEST" &
@@ -363,7 +381,7 @@ fi
 "$JQ" '.Files |= map(.Path |= gsub("\\\\"; "/"))' "$TMP_MANIFEST" > "${TMP_MANIFEST}.tmp" && mv "${TMP_MANIFEST}.tmp" "$TMP_MANIFEST"
 
 FILE_COUNT=$("$JQ" '.Files | length' "$TMP_MANIFEST")
-echo "Found $FILE_COUNT files in manifest."
+stdout "Found $FILE_COUNT files in manifest."
 
 
 # Determine which files need to be updated
@@ -386,13 +404,13 @@ for i in $(seq 0 $((FILE_COUNT - 1))); do
     if [[ -f "$LOCAL_PATH" ]]; then
         LOCAL_HASH=$(hash_file "$LOCAL_PATH")
         if [[ "$LOCAL_HASH" == "$EXPECTED_HASH" ]]; then
-            echo "[OK] $FILE_PATH"
+            stdout "[OK] $FILE_PATH"
             ((CURRENT+=1))
             continue
         fi
     fi
 
-    echo "[UPDATE NEEDED] $FILE_PATH"
+    stdout "[UPDATE NEEDED] $FILE_PATH"
     TO_UPDATE+=("$FILE_PATH")
     FILE_URLS["$FILE_PATH"]="${URLS[*]}"
     FILE_SIZE=$("$JQ" -r ".Files[$i].Size" "$TMP_MANIFEST")
@@ -404,14 +422,14 @@ NUM_TO_UPDATE="${#TO_UPDATE[@]}"
 SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $TOTAL_DOWNLOAD_SIZE / 1024 / 1024 }")
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo ""
-    echo "Dry run complete. $NUM_TO_UPDATE files would be updated. Download size: $SIZE_MB MiB."
+    stdout ""
+    stdout "Dry run complete. $NUM_TO_UPDATE files would be updated. Download size: $SIZE_MB MiB."
     exit $E_SUCCESS
 fi
 
 if [[ "$NUM_TO_UPDATE" -gt 0 ]]; then
-    echo ""
-    echo "$NUM_TO_UPDATE files need to be updated. Total download size: ${SIZE_MB} MiB."
+    stdout ""
+    stdout "$NUM_TO_UPDATE files need to be updated. Total download size: ${SIZE_MB} MiB."
     
     notify_status "$NUM_TO_UPDATE file updates (size: $SIZE_MB MiB) are being downloaded."
 fi
@@ -428,7 +446,7 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
     FILE_SIZE=$("$JQ" -r ".Files[] | select(.Path == \"$FILE_PATH\") | .Size" "$TMP_MANIFEST")
     FILE_SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $FILE_SIZE / 1024 / 1024 }")
 
-    echo "Downloading $FILE_PATH ($FILE_SIZE_MB MiB)..."
+    stdout "Downloading $FILE_PATH ($FILE_SIZE_MB MiB)..."
 
     SUCCESS=0
     CURRENT_DOWNLOADED=0
@@ -449,7 +467,7 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
     fi
     
     for URL in "${URLS[@]}"; do
-        echo "Attempting $URL..."
+        stdout "Attempting $URL..."
         
         CURL_FLAGS=(--fail --location)
         if [[ "$CURL_PROGRESS" -eq 1 ]]; then
@@ -471,11 +489,11 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
                 SUCCESS=1
                 break
             else
-                echo "Hash mismatch for $FILE_PATH from $URL. Expected $EXPECTED_HASH, was $NEW_HASH."
+                stdout "Hash mismatch for $FILE_PATH from $URL. Expected $EXPECTED_HASH, was $NEW_HASH."
                 rm -f "$TMP_PATH"
             fi
         else
-            echo "Download failed from $URL"
+            stdout "Download failed from $URL"
             rm -f "$TMP_PATH"
         fi
     done
@@ -492,9 +510,9 @@ for FILE_PATH in "${TO_UPDATE[@]}"; do
     fi
 done
 
-echo ""
-echo "$UPDATED files updated."
-echo "$CURRENT files already up to date."
+stdout ""
+stdout "$UPDATED files updated."
+stdout "$CURRENT files already up to date."
 
 if [[ -n "$GUI_MODE" ]]; then
     gui_progress_update "100"
@@ -504,7 +522,7 @@ fi
 cleanup
 
 if [[ "${#CMD_ARGS[@]}" -gt 0 ]]; then
-    echo "Running post-update command: ${CMD_ARGS[*]}"
+    stdout "Running post-update command: ${CMD_ARGS[*]}"
     exec "${CMD_ARGS[@]}"
 fi
 
