@@ -10,9 +10,9 @@ The script does basically the exact same thing the official launcher does. It fe
   - If you want a graphical progress bar, install `zenity` and pass the `--gui` parameter.
   - If you want the script to send desktop notifications when files are updated or if updates fail, install `notify-send` and pass the `--notifications` parameter.
   - Alternatively you can download a static jq binary from https://github.com/jqlang/jq/releases and specify its path using the `JQ=/path/to/jq` before running the script.
-2. Download [epoch-update.sh](https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/epoch-update.sh) (right click > Save as) and place it in your Project Epoch installation directory (next to WoW.exe). Alternatively place anywhere and specify the WOW_DIR environment variable before running.
+2. Download [epoch-update.sh](https://github.com/brndd/epoch-update.sh/raw/refs/heads/master/epoch-update.sh) (right click > Save as) and place it anywhere.
 3. `chmod +x epoch-update.sh` to make the script executable.
-4. Run the script. If you're unsure about it working, you can pass `--dry-run` to just check if files need updating but not download anything. You can also pass `--help` to see the options.
+4. Run the script in the same directory as your WoW.exe -- it expects the working directory to contain the game (alternatively run anywhere and specify the WOW_DIR environment variable before running). If you're unsure about it working, you can pass `--dry-run` to just check if files need updating but not download anything. You can also pass `--help` to see the options.
 
 The script can work both as a standalone updater (default), for launching a command, and as a Steam launch shim. Read below for more details.
 
