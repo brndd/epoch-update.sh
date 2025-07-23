@@ -6,7 +6,7 @@ installer_slug: project-epoch-nolauncher
 name: Project Epoch
 notes: 'Includes an automatic updater script.'
 runner: wine
-require-binaries: jq, curl, notify-send
+require-binaries: jq, curl, zenity
 script:
   files:
   - file1: https://epoch-cdn.com/client/3.3.5-enUS-minified.zip
@@ -17,10 +17,7 @@ script:
     prefix: $GAMEDIR
   install_complete_text: "Installation Complete!\r\n\r\n\
     Please note: the game has been set up with a pre-launch script to \
-    automatically download updates from Project Epoch upon launch. \
-    You should get a desktop notification if updates are being downloaded. \
-    Please wait for the download to complete when this happens; the game will \
-    launch automatically once it's done."
+    automatically download updates from Project Epoch upon launch."
   installer:
   - extract:
       file: $file1
@@ -32,7 +29,7 @@ script:
   - execute:
       env:
         WOW_DIR: $GAMEDIR/drive_c/project_epoch/
-      command: bash "$GAMEDIR/drive_c/project_epoch/epoch-update.sh" --headless
+      command: bash "$GAMEDIR/drive_c/project_epoch/epoch-update.sh"
       description: Updating game files...
       disable_runtime: true
   - task:
@@ -41,10 +38,7 @@ script:
       name: create_prefix
       prefix: $GAMEDIR
   system:
-    env:
-      WOW_DIR: $GAMEDIR/drive_c/project_epoch/
-    prelaunch_command: $GAMEDIR/drive_c/project_epoch/epoch-update.sh
-    prelaunch_wait: true
+    prefix_command: $GAMEDIR/drive_c/project_epoch/epoch-update.sh --gui --gui-fallback --
 slug: project-epoch-nolauncher
 steamid: null
 version: "launcherless"

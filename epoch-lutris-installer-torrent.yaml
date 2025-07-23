@@ -6,7 +6,7 @@ installer_slug: project-epoch-nolauncher-torrent
 name: Project Epoch
 notes: 'Requires manually downloading the game client from the website. Includes an automatic updater script.'
 runner: wine
-require-binaries: jq, curl, notify-send
+require-binaries: jq, curl, zenity
 script:
   files:
   - file1: "N/A:Select an uncompressed 3.3.5 client (select the WoW.exe)"
@@ -18,10 +18,7 @@ script:
     prefix: $GAMEDIR
   install_complete_text: "Installation Complete!\r\n\r\n\
     Please note: the game has been set up with a pre-launch script to \
-    automatically download updates from Project Epoch upon launch. \
-    You should get a desktop notification if updates are being downloaded. \
-    Please wait for the download to complete when this happens; the game will \
-    launch automatically once it's done."
+    automatically download updates from Project Epoch upon launch."
   installer:
   - execute:
       command: bash "$file2" "$file1" "$GAMEDIR/drive_c/project_epoch"
@@ -34,7 +31,7 @@ script:
   - execute:
       env:
         WOW_DIR: $GAMEDIR/drive_c/project_epoch/
-      command: bash "$GAMEDIR/drive_c/project_epoch/epoch-update.sh" --headless
+      command: bash "$GAMEDIR/drive_c/project_epoch/epoch-update.sh"
       description: Updating game files...
       disable_runtime: true
   - task:
@@ -43,10 +40,7 @@ script:
       name: create_prefix
       prefix: $GAMEDIR
   system:
-    env:
-      WOW_DIR: $GAMEDIR/drive_c/project_epoch/
-    prelaunch_command: $GAMEDIR/drive_c/project_epoch/epoch-update.sh
-    prelaunch_wait: true
+    prefix_command: $GAMEDIR/drive_c/project_epoch/epoch-update.sh --gui --gui-fallback --
 slug: project-epoch-nolauncher-torrent
 steamid: null
 version: "launcherless"
