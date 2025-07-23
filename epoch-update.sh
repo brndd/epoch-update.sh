@@ -184,7 +184,7 @@ function gui_status_update() {
     if [[ -z "$GUI_MODE" ]]; then
         return
     fi
-    if [[ "$GUI_MODE" == "zenity" && -n "GUI_PIPE" ]]; then
+    if [[ "$GUI_MODE" == "zenity" && -n "$GUI_PIPE" ]]; then
         echo "#${1}" >&3
     fi
 }
