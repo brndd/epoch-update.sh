@@ -63,7 +63,7 @@ Command Execution:
 
 The best way to use the script with Lutris is to set it as the "Command prefix" under the "System options" of the game configuration, like so:
 
-`/path/to/epoch-update.sh --gui --gui --gui-fallback --`
+`/path/to/epoch-update.sh --gui --gui-fallback --`
 
 This way Lutris will first start the script, which will handle any updates and display its GUI and then launch the game seamlessly.
 
