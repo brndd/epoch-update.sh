@@ -572,6 +572,8 @@ stdout "$CURRENT files already up to date."
 if [[ -n "$GUI_MODE" ]]; then
     gui_progress_update "100"
     gui_status_update "Done!"
+else
+    notify_status "Done. $UPDATED files updated"
 fi
 
 cleanup
