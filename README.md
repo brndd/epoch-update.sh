@@ -1,3 +1,9 @@
+# Deprecated
+
+This was for the launch version of the server and stopped working when Epoch merged with Ascension.
+
+I did some work on a version of this that would replace the Ascension launcher, but never finished it. Contact me if you're interested in that work.
+
 # epoch-update.sh
 
 A ~~simple~~ updater bash script for Project Epoch to replace the official Electron-based updater, which can work poorly under Wine.
